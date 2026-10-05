@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.tools/
+.asset-cache/
+public/engine/
+public/models/
+public/asset-manifest.json
+*.local
+*.tsbuildinfo
+tests/fixtures/*.wav
+.DS_Store

@@ -1,0 +1,8 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    { "label": "Apex: develop", "type": "shell", "command": "powershell", "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/run.ps1", "dev"], "isBackground": true, "problemMatcher": [], "presentation": { "reveal": "always", "panel": "dedicated" } },
+    { "label": "Apex: check", "type": "shell", "command": "powershell", "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/run.ps1", "check"], "group": { "kind": "test", "isDefault": true }, "problemMatcher": [] },
+    { "label": "Apex: preview offline build", "type": "shell", "command": "powershell", "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/scripts/run.ps1", "preview"], "isBackground": true, "problemMatcher": [], "presentation": { "reveal": "always", "panel": "dedicated" } }
+  ]
+}
