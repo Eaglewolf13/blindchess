@@ -140,7 +140,7 @@ test('resume and last-move commands, safe deletion, and voice settings survive r
   await expect(page.getByLabel('Extra gap before letter', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('Extra letter–number gap', { exact: true })).toHaveCount(0);
   await page.getByLabel('Square pronunciation', { exact: true }).selectOption('letters-spaced');
-  await expect(page.getByLabel('Extra gap before letter', { exact: true })).toHaveValue('100');
+  await expect(page.getByLabel('Extra gap before letter', { exact: true })).toHaveValue('0');
   await expect(page.getByLabel('Extra letter–number gap', { exact: true })).toHaveValue('0');
   await page.getByLabel('Extra gap before letter', { exact: true }).fill('140');
   await page.getByLabel('Extra letter–number gap', { exact: true }).fill('60');

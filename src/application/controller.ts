@@ -139,6 +139,7 @@ export class AppController {
     }
   }
   previewSpeech() {
+    this.output.stop();
     this.output.say(
       'White played pawn a 2 to a 4. Black played bishop e 3 to f 2. King f 8 to d 8.',
     );
@@ -188,6 +189,7 @@ export class AppController {
       this.message('Resume game is disabled in practice settings.', 'error');
       return;
     }
+    this.output.stop();
     this.update({ reviewPly: null, evaluation: null });
     this.message(
       this.session.record.resultText ?? `${colorName(this.session.chess.turn())} to move.`,
@@ -230,6 +232,8 @@ export class AppController {
     this.announceReview();
   }
   private announceReview() {
+    // A deliberate review jump replaces narration for the previously displayed position.
+    this.output.stop();
     const ply = this.state.reviewPly;
     const move = ply ? this.session.record.moves[ply - 1] : undefined;
     this.message(

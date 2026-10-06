@@ -24,8 +24,10 @@ export interface ChessEngine {
 }
 export interface SpeechOutput {
   configure(preferences: SpeechPreferences): void;
+  /** Queue an announcement after any current speech, without blocking the caller. */
   say(text: string): void;
   setEnabled(enabled: boolean): void;
+  /** Cancel current speech and discard every queued announcement. */
   stop(): void;
 }
 export interface SpeechInput {

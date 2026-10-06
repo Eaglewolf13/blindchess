@@ -36,7 +36,11 @@ describe('speech pronunciation', () => {
     ]);
   });
   it('merges zero-gap boundaries so the synthesizer does not add a chunk pause there', () => {
-    const settings = { ...DEFAULT_SETTINGS, speechPronunciation: 'letters-spaced' as const };
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      speechPronunciation: 'letters-spaced' as const,
+      speechBeforeSquareMs: 100,
+    };
     expect(pronunciationSegments('Pawn a2 to a4.', settings)).toEqual([
       { text: 'Pawn', pauseBeforeMs: 0 },
       { text: 'A two to', pauseBeforeMs: 100 },

@@ -7,5 +7,5 @@ export default defineConfig({
   workers: 1,
   webServer: undefined, // Each test owns a stoppable static server; see tests/fixtures.ts.
   outputDir: 'test-results/webkit',
-  use: { ...base.use, baseURL: 'http://127.0.0.1:4175', browserName: 'webkit', channel: undefined },
+  use: { ...base.use, browserName: 'webkit', channel: undefined }, // The origin fixture supplies a free port.
 });

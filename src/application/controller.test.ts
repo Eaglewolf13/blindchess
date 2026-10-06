@@ -132,7 +132,7 @@ describe('application orchestration', () => {
       expect.objectContaining({
         speechPronunciation: 'letters',
         speechGapMs: 0,
-        speechBeforeSquareMs: 100,
+        speechBeforeSquareMs: 0,
       }),
     );
   });
@@ -151,7 +151,7 @@ describe('application orchestration', () => {
     await f.controller.initialize();
     expect(f.controller.getSnapshot().settings).toMatchObject({
       speechPronunciation: 'letters',
-      speechBeforeSquareMs: 100,
+      speechBeforeSquareMs: 0,
       speechGapMs: 160,
       speechVoice: 'installed',
       voiceConfidence: 0.35,

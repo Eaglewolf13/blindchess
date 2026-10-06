@@ -46,7 +46,7 @@ export function SpeechSettings({
       <p className="muted">
         {settings.speechPronunciation === 'letters'
           ? 'Reads “bishop E three to F two” as one sentence, with no commas added inside squares and no added timers.'
-          : 'Adjust the gap before each letter separately from the gap between letter and number. No commas are added. Try 100 ms before the letter and 0 ms between letter and number.'}
+          : 'Both gaps default to zero, keeping the sentence together with natural spacing. No commas are added. You can still adjust either gap if needed.'}
       </p>
       {settings.speechPronunciation !== 'letters' && (
         <>

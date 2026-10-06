@@ -12,6 +12,7 @@ export class BrowserSpeechOutput implements SpeechOutput {
   private muteUntil = 0;
   private sequence = 0;
   private active = false;
+  private pending: string[] = [];
   private pauseTimer: ReturnType<typeof setTimeout> | undefined;
   // Keep the active utterance alive and make duplicate native callbacks harmless.
   private utterance: SpeechSynthesisUtterance | null = null;
@@ -44,8 +45,19 @@ export class BrowserSpeechOutput implements SpeechOutput {
     if (!enabled) this.stop();
   }
   say(text: string) {
-    if (!this.enabled || !('speechSynthesis' in window)) return;
-    this.stop();
+    if (!this.enabled || !('speechSynthesis' in window) || !text.trim()) return;
+    this.pending.push(text);
+    if (!this.active) this.playNext();
+  }
+  /** Queue complete announcements so their coordinate segments cannot interleave. */
+  private playNext() {
+    const text = this.pending.shift();
+    if (text === undefined) {
+      this.active = false;
+      this.muteUntil = performance.now() + 350;
+      return;
+    }
+    this.active = true; // Also covers gaps within and between queued announcements.
     const sequence = this.sequence;
     const { speechVoice } = this.preferences;
     const segments = pronunciationSegments(text, this.preferences);
@@ -58,11 +70,9 @@ export class BrowserSpeechOutput implements SpeechOutput {
     const speak = (index: number) => {
       if (sequence !== this.sequence) return;
       if (index >= segments.length) {
-        this.active = false;
-        this.muteUntil = performance.now() + 350;
+        this.playNext();
         return;
       }
-      this.active = true; // Includes the deliberate gap between file and rank.
       const utterance = new SpeechSynthesisUtterance(segments[index].text);
       this.utterance = utterance;
       utterance.lang = local?.lang ?? 'en-US';
@@ -78,13 +88,20 @@ export class BrowserSpeechOutput implements SpeechOutput {
       utterance.onerror = () => {
         if (sequence === this.sequence && this.utterance === utterance) this.stop();
       };
-      speechSynthesis.speak(utterance);
+      try {
+        speechSynthesis.speak(utterance);
+      } catch {
+        // A failed native call must not leave the queue or echo protection stuck active.
+        this.stop();
+      }
     };
     speak(0);
   }
   stop() {
     ++this.sequence;
     clearTimeout(this.pauseTimer);
+    this.pauseTimer = undefined;
+    this.pending = [];
     this.active = false;
     this.utterance = null;
     if ('speechSynthesis' in window) speechSynthesis.cancel();

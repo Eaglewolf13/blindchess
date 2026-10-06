@@ -70,7 +70,7 @@ export const DEFAULT_SETTINGS: Settings = {
   voiceDebug: false,
   voiceConfidence: 0.5,
   speechPronunciation: 'letters',
-  speechBeforeSquareMs: 100,
+  speechBeforeSquareMs: 0,
   speechGapMs: 0,
   speechVoice: '',
   enabledCommands: {

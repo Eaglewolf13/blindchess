@@ -55,17 +55,19 @@ Open **Settings → Spoken pronunciation**. These controls are available with de
 | **Letters · flowing sentence** (default) | Sends one sentence such as `Black played bishop E three to F two.` to the system voice, with no added timers or commas inside squares.  |
 | **Letters · adjustable gaps**            | Separately controls the gap before the letter (`pawn → A`, `to → A`) and between letter and number (`A → two`). No commas are inserted. |
 
-Start adjustable mode with **100 ms before the letter** and **0 ms between letter and number**. The sliders allow 0–600 ms before the letter and 0–300 ms between letter and number. For `pawn a2 to a4`, this speaks `Pawn`, waits, speaks `A two to`, waits, then speaks `A four`. A positive letter–number gap instead gives the letter its own chunk, followed by the chosen wait before the rank. These are independent controls; adjust one at a time and replay the test.
+Both adjustable gaps default to **0 ms**, following listening feedback. This reads `pawn a2 to a4` as a single sentence, `Pawn A two to A four`, just like flowing mode. The optional sliders allow 0–600 ms before the letter and 0–300 ms between letter and number. For example, a positive before-letter gap with a zero letter–number gap speaks `Pawn`, waits, speaks `A two to`, waits, then speaks `A four`. A positive letter–number gap gives the letter its own chunk. Existing saved choices are retained.
 
 **Zero joins the text into one speech chunk at that boundary.** It does not merely schedule the next chunk immediately. That avoids an additional synthesis restart between `A` and `two` when their gap is zero. With both sliders at zero, the entire announcement is one chunk. Natural word spacing and original punctuation remain voice-dependent.
 
 A positive extra gap is **not the total audible pause**: the system voice can add tail silence or startup delay to separate chunks. The earlier adjustable mode already used no inserted commas; its large pauses could come from those chunk boundaries. The flowing mode previously inserted commas, which have now been removed. Pronunciation, especially `A`, still needs listening tests with your installed voice.
 
-The phonetic method has been removed following listening feedback. Saved phonetic selections automatically become flowing letters. Existing gap values and the installed-voice choice are retained; missing before-letter settings default to 100 ms. New installations default to a zero letter–number gap.
+The phonetic method has been removed following listening feedback. Saved phonetic selections automatically become flowing letters. Existing gap values and the installed-voice choice are retained; missing gap settings default to zero.
 
 **Installed English voice** lists only voices the browser reports as local. Its list updates when the browser makes voices available. An unavailable saved choice falls back to another local English voice. If none is reported, Automatic leaves the voice choice to the browser; install an English system voice for offline narration. No replacement read-aloud model is bundled. The [Web Speech API specification](https://webaudio.github.io/web-speech-api/#speechsynthesisvoice) defines this local/remote distinction and lets engines vary in their support for pronunciation markup, so this implementation uses plain text rather than relying on SSML support.
 
-Changing pronunciation settings, muting, stopping, or replacing an announcement cancels remaining chunks. Duplicate or stale end callbacks cannot queue a rank twice. Echo protection stays active across deliberate gaps. Screen text and exported PGN keep the original coordinates.
+Announcements are queued as whole lines, including all their coordinate chunks. A fast engine reply waits for “Move made” to finish; the board and engine continue independently. Echo protection stays active until the queue finishes, including deliberate gaps, then retains the usual short cooldown. Duplicate or stale end callbacks cannot queue a rank or line twice.
+
+Mute, Stop test, changing pronunciation settings, switching games, deleting the active game, and review navigation discard old speech. Starting a pronunciation test also clears earlier speech so repeated clicks do not build up samples. A synthesis failure clears the failed queue; the next announcement can start afresh. Screen text and exported PGN keep the original coordinates.
 
 ## Resuming a game
 

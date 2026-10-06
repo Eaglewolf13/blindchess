@@ -1,9 +1,10 @@
 import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { readFile } from 'node:fs/promises';
 import { resolve, sep, extname } from 'node:path';
 import { test as base, expect } from '@playwright/test';
 
-type Origin = { stop: () => Promise<void> } | null;
+type Origin = { url: string; stop: () => Promise<void> } | null;
 /** WebKit's offline-emulation bug kills even service-worker-only responses.
  * Close a test-owned origin instead. This tests server loss, not navigator.onLine.
  * https://github.com/microsoft/playwright/issues/42775
@@ -48,7 +49,7 @@ export const test = base.extend<{ origin: Origin; disconnectOrigin: () => Promis
       });
       await new Promise<void>((done, reject) => {
         server.once('error', reject);
-        server.listen(4175, '127.0.0.1', done);
+        server.listen(0, '127.0.0.1', done); // Let the OS choose a free port; do not occupy a preview's port.
       });
       let stopped = false;
       const stop = async () => {
@@ -60,13 +61,17 @@ export const test = base.extend<{ origin: Origin; disconnectOrigin: () => Promis
         );
       };
       try {
-        await use({ stop });
+        const { port } = server.address() as AddressInfo;
+        await use({ url: `http://127.0.0.1:${port}`, stop });
       } finally {
         await stop();
       }
     },
     { auto: true },
   ],
+  baseURL: async ({ origin }, use, testInfo) => {
+    await use(origin?.url ?? testInfo.project.use.baseURL);
+  },
   disconnectOrigin: async ({ context, origin, baseURL }, use) => {
     await use(async () => {
       if (origin) {
