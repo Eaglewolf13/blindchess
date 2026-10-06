@@ -1,22 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { pronunciationText, rejectionReason, UtteranceBuffer } from './voice-utils';
+import { pronunciationText, pronunciationSegments, UtteranceBuffer } from './voice-utils';
 
 describe('speech pronunciation', () => {
   it('speaks file letters and ranks without changing ordinary articles or numbers', () => {
     expect(pronunciationText('White played bishop a3 to a 6. A game with a friend. Move 13.')).toBe(
-      'White played bishop ay three to ay six. A game with a friend. Move 13.',
+      'White played bishop ay, three to ay, six. A game with a friend. Move 13.',
     );
     expect(pronunciationText('b2 C3 d4 E5 f6 g7 H8')).toBe(
-      'bee two see three dee four ee five eff six jee seven aitch eight',
+      'bee, two see, three dee, four ee, five eff, six jee, seven aitch, eight',
     );
   });
-});
-describe('recognition filtering', () => {
-  it('explains discarded transcripts and applies the configurable threshold', () => {
-    expect(rejectionReason('apex move pawn', [{ conf: 0.4 }], 0.5)).toContain('below 50%');
-    expect(rejectionReason('apex move pawn', [{ conf: 0.4 }], 0.35)).toBeNull();
-    expect(rejectionReason('apex [unk]', [], 0)).toContain('Unknown');
-    expect(rejectionReason('', [], 0)).toContain('No words');
+  it('splits precisely between file and rank for an explicit synthesis delay', () => {
+    expect(pronunciationSegments('Pawn a4.')).toEqual(['Pawn ay', 'four.']);
+    expect(pronunciationSegments('a 4 is empty.')).toEqual(['ay', 'four is empty.']);
+    expect(pronunciationSegments('White to move.')).toEqual(['White to move.']);
+    expect(pronunciationSegments('')).toEqual([]);
   });
 });
 describe('Whisper endpointing', () => {

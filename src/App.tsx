@@ -28,6 +28,7 @@ import { VoiceDiagnostics } from './ui/VoiceDiagnostics';
 import { Play } from './ui/Play';
 import { Guide, Library, SettingsPage, savePgn } from './ui/Pages';
 import { NewGameModal, VoiceModal } from './ui/Modal';
+import { PendingVoiceCommand } from './ui/VoiceDiagnostics';
 
 type Page = 'practice' | 'library' | 'commands' | 'settings';
 const pageNames: Record<Page, string> = {
@@ -66,6 +67,16 @@ export default function App({
   useEffect(() => {
     void controller.initialize();
   }, [controller]);
+  useEffect(() => {
+    speech.resetCommand('The game position or voice settings changed.');
+  }, [
+    speech,
+    state.game.id,
+    state.game.revision,
+    state.reviewPly,
+    state.settings.requireWakeWord,
+    state.settings.voiceConfidence,
+  ]);
   useEffect(() => {
     if ('serviceWorker' in navigator && 'caches' in window)
       void navigator.serviceWorker.ready
@@ -156,7 +167,7 @@ export default function App({
           if (/^(Voice input stopped|Microphone (disconnected|suspended))/i.test(status))
             setMicOn(false);
         },
-        state.settings,
+        () => controller.getSnapshot().settings,
       );
       setMicOn(true);
     } catch (error) {
@@ -325,6 +336,7 @@ export default function App({
             </div>
           )}
           {state.settings.voiceDebug && <VoiceDiagnostics speech={speech} />}
+          <PendingVoiceCommand speech={speech} />
           {needRefresh && (
             <div className="notice">
               <span>A new version is ready. Your saved games will be kept.</span>

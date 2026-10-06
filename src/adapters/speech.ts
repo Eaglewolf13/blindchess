@@ -3,13 +3,18 @@ import type { SpeechInput, SpeechOutput } from '../ports';
 import { speechModelUrl, RECOGNIZERS } from './offline';
 import type { Model, KaldiRecognizer } from 'vosk-browser';
 import type { Settings } from '../domain/types';
-import { pronunciationText, rejectionReason, UtteranceBuffer } from './voice-utils';
+import { pronunciationSegments, UtteranceBuffer } from './voice-utils';
+import { VoiceCommandAssembler } from '../domain/voice-command';
 
 export class BrowserSpeechOutput implements SpeechOutput {
   private enabled = true;
   private muteUntil = 0;
+  private sequence = 0;
+  private active = false;
+  private pauseTimer: ReturnType<typeof setTimeout> | undefined;
   get speaking() {
     return (
+      this.active ||
       ('speechSynthesis' in window && speechSynthesis.speaking) ||
       performance.now() < this.muteUntil
     );
@@ -20,23 +25,42 @@ export class BrowserSpeechOutput implements SpeechOutput {
   }
   say(text: string) {
     if (!this.enabled || !('speechSynthesis' in window)) return;
-    speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(pronunciationText(text));
-    utterance.lang = 'en-US';
-    utterance.rate = 0.95;
+    this.stop();
+    const sequence = this.sequence;
+    const segments = pronunciationSegments(text);
     const voices = speechSynthesis.getVoices();
     // Prefer an installed voice so speech output also works offline.
     const local =
       voices.find((voice) => voice.localService && voice.lang === 'en-US') ??
       voices.find((voice) => voice.localService && voice.lang.startsWith('en'));
-    if (local) utterance.voice = local;
-    this.muteUntil = performance.now() + 250;
-    utterance.onend = utterance.onerror = () => {
-      this.muteUntil = performance.now() + 350;
+    const speak = (index: number) => {
+      if (sequence !== this.sequence) return;
+      if (index >= segments.length) {
+        this.active = false;
+        this.muteUntil = performance.now() + 350;
+        return;
+      }
+      this.active = true; // Includes the deliberate gap between file and rank.
+      const utterance = new SpeechSynthesisUtterance(segments[index]);
+      utterance.lang = 'en-US';
+      utterance.rate = 0.95;
+      if (local) utterance.voice = local;
+      utterance.onend = () => {
+        if (sequence !== this.sequence) return;
+        if (index + 1 === segments.length) speak(index + 1);
+        else this.pauseTimer = setTimeout(() => speak(index + 1), 160);
+      };
+      utterance.onerror = () => {
+        if (sequence === this.sequence) this.stop();
+      };
+      speechSynthesis.speak(utterance);
     };
-    speechSynthesis.speak(utterance);
+    speak(0);
   }
   stop() {
+    ++this.sequence;
+    clearTimeout(this.pauseTimer);
+    this.active = false;
     if ('speechSynthesis' in window) speechSynthesis.cancel();
     this.muteUntil = performance.now() + 350;
   }
@@ -55,6 +79,8 @@ export interface VoiceSnapshot {
   level: number;
   partial: string;
   status: string;
+  pending: string;
+  expected: string[];
   events: VoiceEvent[];
 }
 export class LocalSpeechInput implements SpeechInput {
@@ -62,6 +88,8 @@ export class LocalSpeechInput implements SpeechInput {
     level: 0,
     partial: '',
     status: 'Microphone paused.',
+    pending: '',
+    expected: [],
     events: [],
   };
   private listeners = new Set<() => void>();
@@ -71,6 +99,11 @@ export class LocalSpeechInput implements SpeechInput {
   private whisperBusy = false;
   private whisperTimer: ReturnType<typeof setTimeout> | undefined;
   private cancelLoad: (() => void) | null = null;
+  private assembler = new VoiceCommandAssembler();
+  private resetRecognition: (() => void) | null = null;
+  private clearAudio: (() => void) | null = null;
+  private statusSink: ((text: string) => void) | null = null;
+  private inputEpoch = 0;
   getSnapshot = () => this.snapshot;
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -98,6 +131,18 @@ export class LocalSpeechInput implements SpeechInput {
     });
   }
   clear = () => this.update({ events: [], partial: '' });
+  resetCommand = (reason = 'Pending command cancelled.') => {
+    const hadPending = !!this.assembler.pending;
+    ++this.inputEpoch;
+    this.clearAudio?.();
+    this.resetRecognition?.();
+    this.assembler.reset();
+    this.update({ pending: '', expected: [], partial: '' });
+    if (hadPending) {
+      this.log('', reason);
+      this.statusSink?.(`${reason} Say “apex” to start again.`);
+    }
+  };
   private model: Model | null = null;
   private recognizer: KaldiRecognizer | null = null;
   private stream: MediaStream | null = null;
@@ -110,10 +155,11 @@ export class LocalSpeechInput implements SpeechInput {
   async start(
     onText: (text: string) => Promise<string>,
     onStatus: (status: string) => void,
-    options: Pick<Settings, 'speechRecognizer' | 'voiceConfidence'>,
+    getOptions: () => Pick<Settings, 'speechRecognizer' | 'voiceConfidence' | 'requireWakeWord'>,
   ): Promise<void> {
     await this.stop();
     const generation = ++this.generation;
+    const options = getOptions();
     this.recognizerName = RECOGNIZERS[options.speechRecognizer].label;
     const status = (text: string) => {
       if (generation !== this.generation) return;
@@ -121,28 +167,28 @@ export class LocalSpeechInput implements SpeechInput {
       if (/stopped|disconnected|suspended/i.test(text)) this.log('', text);
       onStatus(text);
     };
+    this.statusSink = status;
     const received = async (text: string, words?: VoiceEvent['words'], elapsed?: number) => {
       if (generation !== this.generation) return;
       this.update({ partial: '' });
-      const reason = rejectionReason(text, words ?? [], options.voiceConfidence);
-      if (reason) {
-        if (text) {
-          this.log(text, reason, words);
-          status(`Heard “${text}”. ${reason}`);
-        }
-        if (/^apex\b/i.test(text))
-          this.output.say('Command unclear. Please repeat the whole command.');
-        if (!text && elapsed !== undefined) {
+      if (!text.trim()) {
+        if (elapsed !== undefined)
           this.log('', 'Speech was detected, but Whisper returned no words.');
-          status('No words recognized. Try speaking a little closer to the microphone.');
-        }
         return;
       }
-      const result = await onText(text);
+      const decision = this.assembler.accept(text, words, getOptions());
+      this.update({ pending: decision.pending, expected: decision.expected });
+      if (decision.kind !== 'command') {
+        this.log(text, decision.detail, words);
+        status(decision.detail);
+        return;
+      }
+      const result = await onText(decision.commandText!);
       if (generation !== this.generation) return;
       this.log(
         text,
-        result + (elapsed !== undefined ? ` Transcription: ${(elapsed / 1000).toFixed(1)} s.` : ''),
+        `${result} Assembled: “${decision.commandText}”. ${decision.detail}` +
+          (elapsed !== undefined ? ` Transcription: ${(elapsed / 1000).toFixed(1)} s.` : ''),
         words,
       );
       status(`Heard “${text}”. ${result}`);
@@ -192,7 +238,11 @@ export class LocalSpeechInput implements SpeechInput {
             } else if (data.type === 'result') {
               clearTimeout(this.whisperTimer);
               this.whisperBusy = false;
-              void received(data.text, undefined, data.elapsed);
+              if (data.epoch === this.inputEpoch) void received(data.text, undefined, data.elapsed);
+              else
+                status(
+                  'Listening for “apex”. Discarded transcription from the previous command context.',
+                );
             } else if (data.type === 'error') {
               clearTimeout(timer);
               clearTimeout(this.whisperTimer);
@@ -243,30 +293,42 @@ export class LocalSpeechInput implements SpeechInput {
           model.terminate();
           return;
         }
-        const recognizer =
-          options.speechRecognizer === 'vosk-open'
-            ? new model.KaldiRecognizer(context.sampleRate)
-            : new model.KaldiRecognizer(context.sampleRate, JSON.stringify(speechVocabulary()));
-        this.recognizer = recognizer;
-        recognizer.setWords(true);
-        recognizer.on('result', (message) => {
-          if (generation !== this.generation || message.event !== 'result') return;
-          const text = message.result.text.trim();
-          const words = message.result.result ?? [];
-          void received(text, words);
-        });
-        recognizer.on('partialresult', (message) => {
-          if (
-            generation === this.generation &&
-            message.event === 'partialresult' &&
-            message.result.partial !== this.snapshot.partial
-          )
-            this.update({ partial: message.result.partial });
-        });
-        recognizer.on('error', () => {
-          status('Voice input stopped. Try enabling the microphone again.');
-          void this.stop();
-        });
+        const createRecognizer = () => {
+          this.recognizer?.remove();
+          const recognizer =
+            options.speechRecognizer === 'vosk-open'
+              ? new model.KaldiRecognizer(context.sampleRate)
+              : new model.KaldiRecognizer(context.sampleRate, JSON.stringify(speechVocabulary()));
+          this.recognizer = recognizer;
+          recognizer.setWords(true);
+          recognizer.on('result', (message) => {
+            if (
+              generation !== this.generation ||
+              this.recognizer !== recognizer ||
+              message.event !== 'result'
+            )
+              return;
+            const text = message.result.text.trim();
+            const words = message.result.result ?? [];
+            void received(text, words);
+          });
+          recognizer.on('partialresult', (message) => {
+            if (
+              generation === this.generation &&
+              this.recognizer === recognizer &&
+              message.event === 'partialresult' &&
+              message.result.partial !== this.snapshot.partial
+            )
+              this.update({ partial: message.result.partial });
+          });
+          recognizer.on('error', () => {
+            if (this.recognizer !== recognizer) return;
+            status('Voice input stopped. Try enabling the microphone again.');
+            void this.stop();
+          });
+        };
+        this.resetRecognition = createRecognizer;
+        createRecognizer();
       }
       if (generation !== this.generation || !this.stream) return;
       await context.audioWorklet.addModule('/audio-capture.js');
@@ -275,6 +337,11 @@ export class LocalSpeechInput implements SpeechInput {
       let buffer = new Float32Array(4096),
         offset = 0;
       const utterance = new UtteranceBuffer(context.sampleRate);
+      this.clearAudio = () => {
+        buffer = new Float32Array(4096);
+        offset = 0;
+        utterance.reset();
+      };
       let lastMeter = 0,
         wasSpeaking = false;
       this.capture.port.onmessage = ({ data }: MessageEvent<Float32Array>) => {
@@ -291,11 +358,15 @@ export class LocalSpeechInput implements SpeechInput {
           status(
             speaking
               ? 'Announcement playing; voice input resumes when it finishes.'
-              : 'Listening. Say “apex” and the command together.',
+              : this.assembler.pending
+                ? `Continue “${this.assembler.pending}”. Waiting for ${this.assembler.expected.join(' or ')}.`
+                : 'Listening for “apex”. Pauses inside commands are welcome.',
           );
           if (speaking) {
             this.log('', 'Input suppressed during spoken announcement (echo protection).');
             utterance.reset();
+            if (this.assembler.pending || this.snapshot.partial)
+              this.resetCommand('Pending command cleared for a spoken announcement.');
           }
         }
         const samples = speaking ? new Float32Array(data.length) : data;
@@ -312,9 +383,10 @@ export class LocalSpeechInput implements SpeechInput {
               status('Voice input stopped: transcription took too long. Try Vosk on this device.');
               void this.stop();
             }, 60000);
-            this.whisper.postMessage({ type: 'audio', samples: audio, rate: context.sampleRate }, [
-              audio.buffer,
-            ]);
+            this.whisper.postMessage(
+              { type: 'audio', samples: audio, rate: context.sampleRate, epoch: this.inputEpoch },
+              [audio.buffer],
+            );
           }
           return;
         }
@@ -348,7 +420,7 @@ export class LocalSpeechInput implements SpeechInput {
           }
         };
       });
-      status('Listening. Say “apex” and the command together.');
+      status('Listening for “apex”. Pauses inside commands are welcome.');
     } catch (error) {
       this.log('', error instanceof Error ? error.message : 'Voice startup failed.');
       await this.stop();
@@ -357,6 +429,10 @@ export class LocalSpeechInput implements SpeechInput {
   }
   async stop() {
     ++this.generation;
+    ++this.inputEpoch;
+    this.resetRecognition = null;
+    this.clearAudio = null;
+    this.statusSink = null;
     const cancelLoad = this.cancelLoad;
     this.cancelLoad = null;
     cancelLoad?.();
@@ -364,7 +440,8 @@ export class LocalSpeechInput implements SpeechInput {
     this.whisper?.terminate();
     this.whisper = null;
     this.whisperBusy = false;
-    this.update({ level: 0, partial: '', status: 'Microphone paused.' });
+    this.assembler.reset();
+    this.update({ level: 0, partial: '', pending: '', expected: [], status: 'Microphone paused.' });
     this.capture?.disconnect();
     this.capture = null;
     this.source?.disconnect();

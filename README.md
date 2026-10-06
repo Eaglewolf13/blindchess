@@ -26,7 +26,7 @@ Open **this directory** (`blindchess/blindchess`, containing `package.json`) as 
 
 1. Start in **Self play**, or choose **New game → Play Stockfish**. Choose your side and level 1–8.
 2. Use the Piece / From / To selectors, or type `move pawn e2 e4` in the command bar.
-3. For voice, select **Enable microphone**, download the voice pack, then select **Enable microphone** again and allow browser access. Say **“apex move pawn e two e four”** in one utterance.
+3. For voice, select **Enable microphone**, download the voice pack, then select **Enable microphone** again and allow browser access. Say **“apex move pawn e two e four”**. You can pause between required parts; an unfinished command stays visible until you complete or cancel it.
 4. The microphone keeps listening while the app is active. The microphone button pauses/resumes it. The speaker button separately mutes announcements.
 5. Games save after every move. **My games** opens them for visual or spoken review and PGN export. Resume with **Return to play** or **“apex return to play.”** The trash button deletes an individual game after confirmation, with an option to export first.
 6. Missed an announcement? Say **“apex last move”** or select **Repeat last move**. It repeats the latest actual move in the open game, its color, and the next turn. In review it still refers to the live game and tells you that review is active.
@@ -61,7 +61,13 @@ Spoken commands require the `apex` prefix by default. Typed commands accept it o
 | `apex new game self`                               | Start self play after the game ends, or from an untouched starting position.            |
 | `apex new game engine three`                       | Start an engine game at level 3. Easy / medium / strong / full power are also accepted. |
 
-Commands are full-utterance matches: ordinary conversation is not searched for embedded commands. The default recognizer uses a small vocabulary, an unknown-word escape, and word-confidence filtering. Debug mode exposes the configurable Vosk threshold (50% by default); lowering it increases accidental-command risk. Rejected utterances beginning with “apex” also get an audible retry message when sound is enabled. Audio is processed locally. Input is suppressed during the app's narration to avoid feedback loops; the status explains this. Square letters use phonetic spellings for synthesis, so `a3` is spoken as “ay three” while screen text stays unchanged.
+Voice input finds **apex anywhere in a finalized transcript**, ignores earlier words, and fills the command's required slots in order. Unknown sounds, low-confidence words, and words that do not fit the next slot are skipped. For example, `apex move hello nice queen wrong what bishop c4 c5` becomes `move queen c4 c5`. Unfinished commands survive pauses with no timeout. Say **apex** again to restart, or select **Cancel pending command**. The first matching words fill each slot, so conversation after the wake word can contribute to a command. Changing the position, review position, or recognition settings clears unfinished input; spoken announcements also clear pending input for echo protection.
+
+All three recognizers share this assembly step. It splits coordinates such as `a2a3` and accepts a small explicit list of aliases in the appropriate slots, including `bond` / `bon` / `on` for pawn and `moved` for move. It does not guess arbitrary missing words or use move legality to choose a transcription. The Vosk acoustic vocabulary is unchanged during a command; slot filtering happens after transcription. Typed commands still require a whole-command match.
+
+Execution waits for a finalized speech segment, never a revisable draft. Include optional arguments in the same segment: bare `review`, `next`, and `new game engine` are already complete commands, and a move without a promotion suffix defaults to queen. Once complete, the normal command settings, turn checks, and chess rules apply.
+
+The **Minimum Vosk word confidence** control (50% by default) is available with debug off and applies immediately. Lower values accept more uncertain words; changing the setting clears unfinished input. Audio is processed locally. Input is suppressed during narration to avoid feedback loops. Square letters retain their phonetic spellings, with an explicit 160 ms gap before each rank: `a3` becomes “ay … three” while screen text stays unchanged.
 
 ## Offline use and installation
 

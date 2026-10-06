@@ -2,9 +2,9 @@
 
 ## Verified in this workspace · 6 October 2026
 
-- TypeScript check and all **38 unit/application tests passed**.
+- TypeScript check and all **70 unit/application tests passed**, including slot assembly, cancellation of stale recognition results, live confidence settings, and narration timing.
 - Production build passed, including a generated service worker with app, speech runtime, and Stockfish assets.
-- All **9 Chrome integration tests passed**, covering offline play, both voice packs, resume/last-move commands, deletion, diagnostic settings, and three microphone modes. Restricted Vosk executes the synthetic move; general Vosk safely rejects its mistranscription; Whisper executes a separate synthetic last-move command. These test integration, not human accuracy.
+- All **10 Chrome integration tests passed**, covering offline play, both voice packs, resume/last-move commands, deletion, diagnostic settings, and three microphone modes. Restricted Vosk executes both a continuous move and a move split by a 4.5-second pause with preceding background words; general Vosk leaves its mistranscription unfinished without executing; Whisper executes a separate synthetic last-move command. These test integration, not human accuracy.
 - All **6 WebKit integration tests passed** using the stopped-origin method explained below. These cover the new UI, deletion, and cached voice resources. With the generated WAV present, the Whisper pack test also runs actual WASM transcription in an offline Worker in both Chrome and WebKit.
 - Desktop and 390-pixel mobile screenshots were inspected. Real iPhone/iPad microphone behavior, background interruptions, and human speech accuracy remain to be checked on devices.
 
@@ -24,11 +24,11 @@
 
 Screenshots and failures go in ignored `test-results/` and `playwright-report/`. Tests do not read your personal browser profile or microphone.
 
-For the optional real audio-pipeline test on Windows, first run `powershell -ExecutionPolicy Bypass -File scripts/generate-speech-fixture.ps1`. It uses an installed US English system voice to generate an ignored WAV file, then Chrome supplies that file as a fake microphone. No actual microphone is recorded. The test is skipped when the fixture is absent.
+For the optional real audio-pipeline tests on Windows, first run `powershell -ExecutionPolicy Bypass -File scripts/generate-speech-fixture.ps1`. It uses an installed US English system voice to generate ignored WAV files, including a move split by 4.5 seconds of silence. Chrome supplies each file as a fake microphone. No actual microphone is recorded. Each test is skipped when its fixture is absent.
 
 For a separate WebKit compatibility check, install `npx playwright install webkit` and run `npm run test:webkit`. This exercises the UI, engine, and service worker in WebKit; it does not claim to emulate iOS microphone hardware or OS permissions. This workspace's downloaded test browser lives at `../.tools/playwright`; set `PLAYWRIGHT_BROWSERS_PATH` to that absolute directory to use it.
 
-The Windows WebKit build does not expose AudioContext. Its Whisper worker test receives PCM decoded by the test runner from the synthetic WAV. This verifies inference and offline loading in WebKit, not microphone capture. Chrome's three voice tests exercise AudioWorklet with a fake microphone. Browser trace outputs use sibling `test-results/chromium` and `test-results/webkit` directories so parallel runs cannot delete each other's traces.
+The Windows WebKit build does not expose AudioContext. Its Whisper worker test receives PCM decoded by the test runner from the synthetic WAV. This verifies inference and offline loading in WebKit, not microphone capture. Chrome's four voice tests exercise AudioWorklet with a fake microphone. Browser trace outputs use sibling `test-results/chromium` and `test-results/webkit` directories so parallel runs cannot delete each other's traces.
 
 **WebKit test limitation:** Playwright WebKit 2359 has an [upstream offline-emulation defect](https://github.com/microsoft/playwright/issues/42775) that rejects service-worker responses when `setOffline(true)` is used. The WebKit tests instead stop their own static origin server, verify that direct network requests fail, then require the same cached reload, engine, and model behavior. Chrome uses actual Playwright offline emulation. The WebKit result verifies operation without the origin server; it does not verify an iPhone's airplane-mode behavior.
 
@@ -45,12 +45,14 @@ Use the production preview locally or a deployed HTTPS site. Plain HTTP over a L
 1. Download the English voice pack. Deny microphone permission once; verify the app explains how to recover. Allow it and enable listening.
 2. Speak at normal pace: `apex move pawn e two e four`, `apex vision e four`, and `apex current eval`.
 3. Verify that the app executes each utterance once, responds audibly, and does not interpret its own output as input.
-4. Speak ordinary conversation, including the word chess and sentences that mention commands. It should not move a piece. Deliberately quote a full valid `apex` command: without speaker/intention detection it can still be recognized, which is why no perfect rejection guarantee is made.
+4. With the wake word required and no command pending, speak ordinary conversation without “apex”; it should not move a piece. Then speak unrelated words before a full `apex` command and verify that the command works. After “apex”, conversation can fill matching slots; this is the selected permissive behavior, not intention detection.
 5. Try knight/night, all eight files, all eight ranks, a castling move, and promotion.
 6. Review from move 2, then say `next three`. Compare the resulting position with the move journal.
 7. Mute spoken responses and confirm that voice input still works. Pause the microphone and confirm that it releases capture.
 8. On iPhone/iPad: test Safari and the installed home-screen app, permission activation, screen locking, backgrounding, a phone interruption, Bluetooth/headphone changes, and recovery.
 9. In airplane mode, reload and repeat an engine game, vision, review, and evaluation. Test narration with the selected installed system voice too.
+10. Pause after the piece, between file and rank, and after the origin. Verify the accepted prefix stays visible. Insert unknown/wrong-slot words, then finish the missing parts. Repeat “apex” halfway through and verify only the new chain is used. Cancel a pending command and verify a delayed transcript cannot finish it.
+11. Change Vosk confidence with debug off and the microphone active. Verify the new threshold applies and persists after reload. Listen for a distinct gap between each square's file and rank; mute mid-announcement and confirm no later segment resumes.
 
 ## Accuracy measurements
 

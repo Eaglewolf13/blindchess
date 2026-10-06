@@ -31,7 +31,7 @@ export interface SpeechInput {
   start(
     onText: (text: string) => Promise<string>,
     onStatus: (status: string) => void,
-    options: Pick<Settings, 'speechRecognizer' | 'voiceConfidence'>,
+    getOptions: () => Pick<Settings, 'speechRecognizer' | 'voiceConfidence' | 'requireWakeWord'>,
   ): Promise<void>;
   stop(): Promise<void>;
 }

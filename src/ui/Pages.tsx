@@ -203,10 +203,11 @@ export function Guide() {
           <Mic size={26} />
         </div>
         <div>
-          <h2>One sentence. One move.</h2>
+          <h2>Say a move at your pace.</h2>
           <p>
-            Say “apex” and your command together. There’s no need to pause after the wake word. The
-            app listens continuously once you enable the microphone.
+            Say “apex” to start, even after other speech. Continue straight into your command or
+            pause between its required parts. Unknown words are skipped; say “apex” again to start
+            over. The app listens once you enable the microphone.
           </p>
         </div>
       </div>
@@ -230,6 +231,11 @@ export function Guide() {
           <p>
             <strong>Promotion</strong>A pawn reaching the last rank becomes a queen unless you
             specify a piece: “apex move pawn a seven a eight promote to knight”.
+          </p>
+          <p>
+            <strong>Optional details</strong>Say an optional number or promotion in the same breath
+            as the command. A complete command such as “review” or “next” runs when you pause; only
+            unfinished commands keep waiting.
           </p>
           <p>
             <strong>Quiet practice</strong>Every voice command is also available through the
@@ -301,7 +307,7 @@ export function SettingsPage({
             checked={settings.voiceDebug}
             onChange={(voiceDebug) => void controller.setSettings({ voiceDebug })}
           />
-          {settings.voiceDebug && settings.speechRecognizer !== 'whisper' && (
+          {settings.speechRecognizer !== 'whisper' && (
             <label className="confidence-control">
               Minimum Vosk word confidence: {Math.round(settings.voiceConfidence * 100)}%
               <input
@@ -311,14 +317,15 @@ export function SettingsPage({
                 max="0.9"
                 step="0.05"
                 value={settings.voiceConfidence}
-                disabled={micOn || recognizerLocked}
+                disabled={recognizerLocked}
                 onChange={(event) =>
                   void controller.setSettings({ voiceConfidence: Number(event.target.value) })
                 }
               />
               <span className="tiny">
-                Pause the microphone before adjusting. Default: 50%. Lower values accept more
-                uncertain words and can cause accidental commands.
+                Applies immediately, even with debug off. Changing it clears any unfinished command.
+                Default: 50%. Lower values accept more uncertain words and can cause accidental
+                commands.
               </span>
             </label>
           )}
@@ -337,7 +344,7 @@ export function SettingsPage({
           />
           <Toggle
             label="Require “apex” before voice commands"
-            description="Recommended to reduce accidental commands during conversation. Say the prefix and command in one sentence."
+            description="Apex starts a command, even after other speech. Pauses between required parts are allowed. Quoting a full command can also trigger it."
             checked={settings.requireWakeWord}
             onChange={(requireWakeWord) => void controller.setSettings({ requireWakeWord })}
           />

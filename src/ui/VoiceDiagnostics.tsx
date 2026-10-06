@@ -1,6 +1,28 @@
 import { useSyncExternalStore } from 'react';
 import type { LocalSpeechInput } from '../adapters/speech';
 
+export function PendingVoiceCommand({ speech }: { speech: LocalSpeechInput }) {
+  const state = useSyncExternalStore(speech.subscribe, speech.getSnapshot);
+  if (!state.pending) return null;
+  return (
+    <section className="notice pending-voice" aria-label="Pending voice command">
+      <div>
+        <strong>Listening to your command</strong>
+        <p>
+          <code>{state.pending}</code>
+        </p>
+        <p>
+          Next: {state.expected.join(' or ')}. Pause as long as you need, then continue. Say “apex”
+          again to start over.
+        </p>
+      </div>
+      <button className="button secondary small" onClick={() => speech.resetCommand()}>
+        Cancel pending command
+      </button>
+    </section>
+  );
+}
+
 export function VoiceDiagnostics({ speech }: { speech: LocalSpeechInput }) {
   const state = useSyncExternalStore(speech.subscribe, speech.getSnapshot);
   return (
@@ -27,9 +49,12 @@ export function VoiceDiagnostics({ speech }: { speech: LocalSpeechInput }) {
         <summary>Reading this panel</summary>
         <p className="muted">
           A flat meter means no microphone signal. A partial transcript is a draft, never a command.
-          Pause briefly at the end of a sentence. Final transcripts below show why input was handled
-          or rejected. Low Vosk word scores can be tested with a lower threshold in Settings; this
-          also increases accidental commands. Whisper does not provide comparable word scores.
+          Finalized speech segments build a command across pauses. Final transcripts below show why
+          input was handled or rejected. Low Vosk word scores can be tested with a lower threshold
+          in Settings; this also increases accidental commands. Whisper does not provide comparable
+          word scores. Words and noise before “apex” are ignored. After it, words below the
+          confidence threshold, unknown sounds, and words that do not fit the next slot are skipped.
+          The confirmed parts stay ready.
         </p>
         <p className="muted">
           Announcements suppress input to avoid hearing themselves. Wait until the status says

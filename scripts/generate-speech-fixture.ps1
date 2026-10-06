@@ -20,4 +20,12 @@ try {
   $lastMove.AppendText('apex last move')
   $lastMove.AppendBreak([TimeSpan]::FromMilliseconds(2000))
   $testVoice.Speak($lastMove)
+  $testVoice.SetOutputToWaveFile((Join-Path (Get-Location) 'tests\fixtures\paused-move.wav'))
+  $pausedMove = New-Object System.Speech.Synthesis.PromptBuilder
+  $pausedMove.AppendBreak([TimeSpan]::FromMilliseconds(2000))
+  $pausedMove.AppendText('one two three one two three apex move pawn e two')
+  $pausedMove.AppendBreak([TimeSpan]::FromMilliseconds(4500))
+  $pausedMove.AppendText('e four')
+  $pausedMove.AppendBreak([TimeSpan]::FromMilliseconds(2500))
+  $testVoice.Speak($pausedMove)
 } finally { $testVoice.Dispose() }

@@ -1,11 +1,21 @@
 import type { PieceSymbol, Square } from 'chess.js';
 import type { Command, CommandId, Promotion } from './types';
+import {
+  literal,
+  pieceSlot,
+  squareSlots,
+  promotionSlot,
+  numberPatterns,
+  levelSlot,
+  type VoicePattern,
+} from './voice-grammar';
 
 export interface CommandDefinition {
   id: CommandId;
   label: string;
   example: string;
   description: string;
+  voice: VoicePattern[];
   match: (text: string) => Command | null;
 }
 const pieceCodes: Record<string, PieceSymbol> = {
@@ -78,24 +88,26 @@ function number(text: string): number | null {
 }
 function squares(text: string): string {
   // Only normalize file/rank homophones in a square context, never an entire sentence.
-  return text.replace(
-    /\b([a-h]|ay|bee|be|see|sea|dee|ee|eff|gee|aitch)\s*(one|two|three|four|for|five|six|seven|eight|ate|[1-8])\b/g,
-    (_, file: string, rank: string) => {
-      const files: Record<string, string> = {
-        ay: 'a',
-        bee: 'b',
-        be: 'b',
-        see: 'c',
-        sea: 'c',
-        dee: 'd',
-        ee: 'e',
-        eff: 'f',
-        gee: 'g',
-        aitch: 'h',
-      };
-      return `${files[file] ?? file}${rank === 'for' ? 4 : rank === 'ate' ? 8 : (numberWords[rank] ?? rank)}`;
-    },
-  );
+  return text
+    .replace(/\b([a-h][1-8])([a-h][1-8])\b/g, '$1 $2')
+    .replace(
+      /\b([a-h]|ay|bee|be|see|sea|dee|ee|eff|gee|aitch)\s*(one|two|three|four|for|five|six|seven|eight|ate|[1-8])\b/g,
+      (_, file: string, rank: string) => {
+        const files: Record<string, string> = {
+          ay: 'a',
+          bee: 'b',
+          be: 'b',
+          see: 'c',
+          sea: 'c',
+          dee: 'd',
+          ee: 'e',
+          eff: 'f',
+          gee: 'g',
+          aitch: 'h',
+        };
+        return `${files[file] ?? file}${rank === 'for' ? 4 : rank === 'ate' ? 8 : (numberWords[rank] ?? rank)}`;
+      },
+    );
 }
 
 // Registry is shared by parsing, settings, and the command reference.
@@ -107,6 +119,24 @@ export const COMMANDS: CommandDefinition[] = [
     example: 'apex move knight g one f three',
     description:
       'Name the piece, its origin, and destination. Add “promote to knight” for an underpromotion.',
+    voice: [[], [literal('to')]].flatMap((connector) => {
+      const base = [
+        literal('move', { moved: 'move' }),
+        pieceSlot,
+        ...squareSlots,
+        ...connector,
+        ...squareSlots,
+      ];
+      return [
+        base,
+        ...[
+          [promotionSlot],
+          [literal('promote'), promotionSlot],
+          [literal('promote'), literal('to'), promotionSlot],
+          [literal('promotion'), promotionSlot],
+        ].map((suffix) => [...base, ...suffix]),
+      ];
+    }),
     match: (text) => {
       const m = squares(text)
         .replace(/\bnight\b/g, 'knight')
@@ -129,6 +159,7 @@ export const COMMANDS: CommandDefinition[] = [
     label: 'Inspect a square',
     example: 'apex vision e four',
     description: 'Hear the piece on a square in the current or reviewed position.',
+    voice: [[literal('vision'), ...squareSlots]],
     match: (text) => {
       const m = squares(text).match(/^vision ([a-h][1-8])$/);
       return m ? { type: 'vision', square: m[1] as Square } : null;
@@ -139,6 +170,7 @@ export const COMMANDS: CommandDefinition[] = [
     label: 'Review moves',
     example: 'apex review ten',
     description: 'Start at White’s move number. Without a number, start at move one.',
+    voice: [[literal('review')], ...numberPatterns.map((slots) => [literal('review'), ...slots])],
     match: (text) => {
       const m = text.match(/^review(?: (.+))?$/);
       const n = m ? number(m[1] ?? '1') : null;
@@ -151,6 +183,7 @@ export const COMMANDS: CommandDefinition[] = [
     example: 'apex next three',
     description:
       'Advance three individual moves and announce the destination. Without a number, advance one.',
+    voice: [[literal('next')], ...numberPatterns.map((slots) => [literal('next'), ...slots])],
     match: (text) => {
       const m = text.match(/^next(?: (.+))?$/);
       const n = m ? number(m[1] ?? '1') : null;
@@ -162,6 +195,7 @@ export const COMMANDS: CommandDefinition[] = [
     label: 'Return to play',
     example: 'apex return to play',
     description: 'Leave review and resume the open game at its latest position.',
+    voice: [[literal('return'), literal('to'), literal('play')]],
     match: (text) => (text === 'return to play' ? { type: 'returnToPlay' } : null),
   },
   {
@@ -170,6 +204,7 @@ export const COMMANDS: CommandDefinition[] = [
     example: 'apex last move',
     description:
       'Repeat the latest move in the open game, its color, and whose turn comes next. Also works during review.',
+    voice: [[literal('last'), literal('move')]],
     match: (text) => (text === 'last move' ? { type: 'lastMove' } : null),
   },
   {
@@ -177,6 +212,7 @@ export const COMMANDS: CommandDefinition[] = [
     label: 'Current evaluation',
     example: 'apex current eval',
     description: 'Ask Stockfish for a quick, maximum-skill assessment of the position.',
+    voice: ['eval', 'evaluation'].map((word) => [literal('current'), literal(word)]),
     match: (text) => (/^current (eval|evaluation)$/.test(text) ? { type: 'eval' } : null),
   },
   {
@@ -184,6 +220,15 @@ export const COMMANDS: CommandDefinition[] = [
     label: 'Start a new game',
     example: 'apex new game engine three',
     description: 'After a game ends, start self play or an engine game at level 1–8.',
+    voice: [
+      [literal('new'), literal('game'), literal('self')],
+      ...[[], [levelSlot], [literal('full'), literal('power')]].map((suffix) => [
+        literal('new'),
+        literal('game'),
+        literal('engine'),
+        ...suffix,
+      ]),
+    ],
     match: (text) => {
       if (text === 'new game self') return { type: 'newGame', mode: 'self', level: 3 };
       const m = text.match(/^new game engine(?: (.+))?$/);

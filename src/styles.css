@@ -2523,6 +2523,21 @@ progress {
   }
 }
 /* Local voice comparison and troubleshooting */
+.pending-voice {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.pending-voice > div {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.pending-voice p {
+  margin: 8px 0;
+  overflow-wrap: anywhere;
+}
+.pending-voice code {
+  font-size: 14px;
+}
 .voice-diagnostics {
   padding: 24px;
   margin-bottom: 24px;

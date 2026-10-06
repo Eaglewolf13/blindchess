@@ -17,7 +17,12 @@ const createTranscriber = pipeline as unknown as (
 ) => Promise<AutomaticSpeechRecognitionPipeline>;
 self.onmessage = async ({
   data,
-}: MessageEvent<{ type: 'load' | 'audio'; samples?: Float32Array; rate?: number }>) => {
+}: MessageEvent<{
+  type: 'load' | 'audio';
+  samples?: Float32Array;
+  rate?: number;
+  epoch?: number;
+}>) => {
   try {
     if (data.type === 'load') {
       transcriber = await createTranscriber('automatic-speech-recognition', 'whisper-tiny.en', {
@@ -42,6 +47,7 @@ self.onmessage = async ({
     const result = await transcriber(audio, { max_new_tokens: 64, do_sample: false });
     self.postMessage({
       type: 'result',
+      epoch: data.epoch,
       text: (Array.isArray(result) ? result[0] : result).text.trim(),
       elapsed: Math.round(performance.now() - started),
     });

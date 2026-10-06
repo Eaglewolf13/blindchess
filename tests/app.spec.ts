@@ -132,10 +132,16 @@ test('resume and last-move commands, safe deletion, and voice settings survive r
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/mobile-voice-settings.png', fullPage: true });
+  await page.getByRole('checkbox', { name: /Voice debug mode/ }).uncheck();
+  await expect(page.getByLabel('Minimum Vosk word confidence', { exact: true })).toBeVisible();
+  await page.getByLabel('Minimum Vosk word confidence', { exact: true }).fill('0.35');
   await page.reload();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByLabel('Local recognizer', { exact: true })).toHaveValue('vosk-open');
-  await expect(page.getByRole('checkbox', { name: /Voice debug mode/ })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: /Voice debug mode/ })).not.toBeChecked();
+  await expect(page.getByLabel('Minimum Vosk word confidence', { exact: true })).toHaveValue(
+    '0.35',
+  );
 });
 
 test('Whisper pack survives offline reload with its local model and runtime intact', async ({

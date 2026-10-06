@@ -2,10 +2,11 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test, expect, chromium } from '@playwright/test';
 
-for (const recognizer of ['vosk', 'vosk-open', 'whisper'])
-  test(`${recognizer}: offline AudioWorklet transcription and command handling`, async () => {
+for (const scenario of ['vosk', 'vosk-open', 'whisper', 'vosk-paused'])
+  test(`${scenario}: offline AudioWorklet transcription and command handling`, async () => {
+    const recognizer = scenario === 'vosk-paused' ? 'vosk' : scenario;
     const fixture = resolve(
-      `tests/fixtures/${recognizer === 'whisper' ? 'last-move' : 'move'}.wav`,
+      `tests/fixtures/${scenario === 'vosk-paused' ? 'paused-move' : recognizer === 'whisper' ? 'last-move' : 'move'}.wav`,
     );
     test.setTimeout(180000);
     test.skip(!existsSync(fixture), 'Generate fixtures with scripts/generate-speech-fixture.ps1.');
@@ -70,9 +71,25 @@ for (const recognizer of ['vosk', 'vosk-open', 'whisper'])
         );
         await expect(page.locator('.count-pill')).toHaveText('0');
       } else {
+        if (scenario === 'vosk-paused') {
+          await expect(page.getByRole('region', { name: 'Pending voice command' })).toContainText(
+            'apex move pawn e two',
+            { timeout: 30000 },
+          );
+          await expect(page.locator('.count-pill')).toHaveText('0');
+          await page.setViewportSize({ width: 390, height: 844 });
+          expect(
+            await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+          ).toBe(true);
+          await page.screenshot({
+            path: 'test-results/mobile-pending-command.png',
+            fullPage: true,
+          });
+        }
         await expect(page.locator('.count-pill')).toHaveText('1', { timeout: 60000 });
         await expect(page.getByText('Black to move', { exact: true })).toBeVisible();
         await expect(page.locator('.voice-log')).toContainText('Handled: move');
+        await expect(page.getByRole('region', { name: 'Pending voice command' })).toHaveCount(0);
       }
       await page.getByRole('button', { name: 'Pause microphone', exact: true }).click();
       expect(external).toEqual([]);
