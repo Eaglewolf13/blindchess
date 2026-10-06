@@ -134,8 +134,15 @@ test('resume and last-move commands, safe deletion, and voice settings survive r
   await page.screenshot({ path: 'test-results/mobile-voice-settings.png', fullPage: true });
   await page.getByRole('checkbox', { name: /Voice debug mode/ }).uncheck();
   await expect(page.getByLabel('Square pronunciation', { exact: true })).toHaveValue('letters');
+  await expect(
+    page.getByLabel('Square pronunciation', { exact: true }).locator('option'),
+  ).toHaveCount(2);
+  await expect(page.getByLabel('Extra gap before letter', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('Extra letter–number gap', { exact: true })).toHaveCount(0);
   await page.getByLabel('Square pronunciation', { exact: true }).selectOption('letters-spaced');
+  await expect(page.getByLabel('Extra gap before letter', { exact: true })).toHaveValue('100');
+  await expect(page.getByLabel('Extra letter–number gap', { exact: true })).toHaveValue('0');
+  await page.getByLabel('Extra gap before letter', { exact: true }).fill('140');
   await page.getByLabel('Extra letter–number gap', { exact: true }).fill('60');
   await expect(
     page.getByRole('button', { name: 'Test pronunciation', exact: true }),
@@ -154,6 +161,7 @@ test('resume and last-move commands, safe deletion, and voice settings survive r
   }
   await page.getByRole('checkbox', { name: /^Spoken responses/ }).uncheck();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
   await page.screenshot({ path: 'test-results/mobile-pronunciation.png', fullPage: true });
   await expect(page.getByLabel('Minimum Vosk word confidence', { exact: true })).toBeVisible();
   await page.getByLabel('Minimum Vosk word confidence', { exact: true }).fill('0.35');
@@ -182,6 +190,7 @@ test('resume and last-move commands, safe deletion, and voice settings survive r
     )
     .toMatchObject({
       speechPronunciation: 'letters-spaced',
+      speechBeforeSquareMs: 140,
       speechGapMs: 60,
       voiceConfidence: 0.35,
     });
@@ -192,9 +201,13 @@ test('resume and last-move commands, safe deletion, and voice settings survive r
     'letters-spaced',
   );
   await expect(page.getByLabel('Extra letter–number gap', { exact: true })).toHaveValue('60');
-  await page.getByLabel('Square pronunciation', { exact: true }).selectOption('phonetic');
-  await page.getByLabel('Extra letter–number gap', { exact: true }).fill('160');
-  await expect(page.getByText(/previous extra gap was 160 ms/)).toBeVisible();
+  await expect(page.getByLabel('Extra gap before letter', { exact: true })).toHaveValue('140');
+  await page.getByLabel('Square pronunciation', { exact: true }).selectOption('letters');
+  await expect(page.getByLabel('Extra gap before letter', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Extra letter–number gap', { exact: true })).toHaveCount(0);
+  await page.getByLabel('Square pronunciation', { exact: true }).selectOption('letters-spaced');
+  await expect(page.getByLabel('Extra gap before letter', { exact: true })).toHaveValue('140');
+  await expect(page.getByLabel('Extra letter–number gap', { exact: true })).toHaveValue('60');
   await expect(page.getByRole('checkbox', { name: /Voice debug mode/ })).not.toBeChecked();
   await expect(page.getByLabel('Minimum Vosk word confidence', { exact: true })).toHaveValue(
     '0.35',

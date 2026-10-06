@@ -1,32 +1,72 @@
 import { describe, it, expect } from 'vitest';
 import { pronunciationSegments, UtteranceBuffer } from './voice-utils';
+import { DEFAULT_SETTINGS } from '../domain/types';
 
 describe('speech pronunciation', () => {
   it('speaks file letters and ranks without changing ordinary articles or numbers', () => {
     expect(
       pronunciationSegments('White played bishop a3 to a 6. A game with a friend. Move 13.'),
-    ).toEqual(['White played bishop A, three to A, six. A game with a friend. Move 13.']);
+    ).toEqual([
+      {
+        text: 'White played bishop A three to A six. A game with a friend. Move 13.',
+        pauseBeforeMs: 0,
+      },
+    ]);
     expect(pronunciationSegments('b2 C3 d4 E5 f6 g7 H8')).toEqual([
-      'B, two C, three D, four E, five F, six G, seven H, eight',
+      { text: 'B two C three D four E five F six G seven H eight', pauseBeforeMs: 0 },
     ]);
     expect(pronunciationSegments('Black played bishop e 3 to f 2. King f8 to d8.')).toEqual([
-      'Black played bishop E, three to F, two. King F, eight to D, eight.',
+      { text: 'Black played bishop E three to F two. King F eight to D eight.', pauseBeforeMs: 0 },
     ]);
   });
-  it('splits precisely between file and rank for an explicit synthesis delay', () => {
-    expect(pronunciationSegments('Pawn a4.', 'letters-spaced')).toEqual(['Pawn A', 'four.']);
-    expect(pronunciationSegments('a 4 is empty.', 'letters-spaced')).toEqual([
-      'A',
-      'four is empty.',
+  it('assigns independent gaps before every file and rank, with no inserted punctuation', () => {
+    expect(
+      pronunciationSegments('Pawn a2 to a4.', {
+        ...DEFAULT_SETTINGS,
+        speechPronunciation: 'letters-spaced',
+        speechBeforeSquareMs: 120,
+        speechGapMs: 20,
+      }),
+    ).toEqual([
+      { text: 'Pawn', pauseBeforeMs: 0 },
+      { text: 'A', pauseBeforeMs: 120 },
+      { text: 'two to', pauseBeforeMs: 20 },
+      { text: 'A', pauseBeforeMs: 120 },
+      { text: 'four.', pauseBeforeMs: 20 },
     ]);
-    expect(pronunciationSegments('Black played bishop e3 to f2.', 'phonetic')).toEqual([
-      'Black played bishop ee',
-      'three to eff',
-      'two.',
+  });
+  it('merges zero-gap boundaries so the synthesizer does not add a chunk pause there', () => {
+    const settings = { ...DEFAULT_SETTINGS, speechPronunciation: 'letters-spaced' as const };
+    expect(pronunciationSegments('Pawn a2 to a4.', settings)).toEqual([
+      { text: 'Pawn', pauseBeforeMs: 0 },
+      { text: 'A two to', pauseBeforeMs: 100 },
+      { text: 'A four.', pauseBeforeMs: 100 },
     ]);
-    expect(pronunciationSegments('a4', 'phonetic')).toEqual(['ay', 'four']);
-    expect(pronunciationSegments('White to move.')).toEqual(['White to move.']);
+    expect(
+      pronunciationSegments('Pawn a2 to a4.', {
+        ...settings,
+        speechBeforeSquareMs: 0,
+        speechGapMs: 20,
+      }),
+    ).toEqual([
+      { text: 'Pawn A', pauseBeforeMs: 0 },
+      { text: 'two to A', pauseBeforeMs: 20 },
+      { text: 'four.', pauseBeforeMs: 20 },
+    ]);
+    expect(
+      pronunciationSegments('Pawn a2 to a4.', { ...settings, speechBeforeSquareMs: 0 }),
+    ).toEqual([{ text: 'Pawn A two to A four.', pauseBeforeMs: 0 }]);
+  });
+  it('does not add an initial pause and preserves ordinary narration and punctuation', () => {
+    const settings = { ...DEFAULT_SETTINGS, speechPronunciation: 'letters-spaced' as const };
+    expect(pronunciationSegments('a4, check.', settings)).toEqual([
+      { text: 'A four, check.', pauseBeforeMs: 0 },
+    ]);
+    expect(pronunciationSegments('White to move.', settings)).toEqual([
+      { text: 'White to move.', pauseBeforeMs: 0 },
+    ]);
     expect(pronunciationSegments('')).toEqual([]);
+    expect(pronunciationSegments(' ', settings)).toEqual([]);
   });
 });
 describe('Whisper endpointing', () => {

@@ -1,6 +1,7 @@
 import type { Move, Square } from 'chess.js';
 import { GameSession, advanceReview, newRecord, reviewPly } from '../domain/game';
 import { parseCommand } from '../domain/commands';
+import { normalizeSpeechPreferences } from '../domain/speech-preferences';
 import {
   DEFAULT_SETTINGS,
   PIECE_NAMES,
@@ -95,6 +96,7 @@ export class AppController {
       const restored = {
         ...DEFAULT_SETTINGS,
         ...settings,
+        ...normalizeSpeechPreferences(settings ?? {}),
         enabledCommands: { ...DEFAULT_SETTINGS.enabledCommands, ...settings?.enabledCommands },
       };
       this.output.setEnabled(restored.sound);
@@ -122,7 +124,11 @@ export class AppController {
     }
   }
   async setSettings(patch: Partial<Settings>) {
-    const settings = { ...this.state.settings, ...patch };
+    const settings = {
+      ...this.state.settings,
+      ...patch,
+      ...normalizeSpeechPreferences({ ...this.state.settings, ...patch }),
+    };
     this.output.setEnabled(settings.sound);
     this.output.configure(settings);
     this.update({ settings });

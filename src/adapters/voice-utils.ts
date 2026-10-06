@@ -1,44 +1,51 @@
-import type { SpeechPreferences } from '../domain/types';
+import { DEFAULT_SETTINGS, type SpeechPreferences } from '../domain/types';
+
+export interface SpeechSegment {
+  text: string;
+  pauseBeforeMs: number;
+}
 
 /** Synthesis-only formatting; screen text and PGN remain unchanged. */
 export function pronunciationSegments(
   text: string,
-  mode: SpeechPreferences['speechPronunciation'] = 'letters',
-): string[] {
-  const files: Record<string, string> = {
-    a: 'ay',
-    b: 'bee',
-    c: 'see',
-    d: 'dee',
-    e: 'ee',
-    f: 'eff',
-    g: 'jee',
-    h: 'aitch',
-  };
+  preferences: Pick<
+    SpeechPreferences,
+    'speechPronunciation' | 'speechBeforeSquareMs' | 'speechGapMs'
+  > = DEFAULT_SETTINGS,
+): SpeechSegment[] {
+  const { speechPronunciation, speechBeforeSquareMs, speechGapMs } = preferences;
   const ranks = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
-  if (mode === 'letters') {
+  if (speechPronunciation === 'letters') {
     // One utterance avoids OS startup/tail silence at every file/rank boundary.
-    // A comma suggests a short pause; the selected system voice controls its duration.
+    // Do not add punctuation between file and rank.
     const sentence = text
       .replace(
         /\b([a-h])\s*([1-8])\b/gi,
-        (_, file: string, rank: string) => `${file.toUpperCase()}, ${ranks[Number(rank) - 1]}`,
+        (_, file: string, rank: string) => `${file.toUpperCase()} ${ranks[Number(rank) - 1]}`,
       )
       .trim();
-    return sentence ? [sentence] : [];
+    return sentence ? [{ text: sentence, pauseBeforeMs: 0 }] : [];
   }
-  const segments: string[] = [];
+  const segments: SpeechSegment[] = [];
+  const append = (part: string, pauseBeforeMs: number) => {
+    const text = part.trim();
+    if (!text) return;
+    const previous = segments.at(-1);
+    // A zero gap means no synthesis boundary, not merely a zero-delay timer.
+    if (previous && pauseBeforeMs === 0) previous.text += ` ${text}`;
+    else segments.push({ text, pauseBeforeMs: previous ? pauseBeforeMs : 0 });
+  };
   let offset = 0,
-    rest = '';
+    rest = '',
+    restPause = 0;
   for (const match of text.matchAll(/\b([a-h])\s*([1-8])\b/gi)) {
-    segments.push(
-      `${rest}${text.slice(offset, match.index)}${mode === 'phonetic' ? files[match[1].toLowerCase()] : match[1].toUpperCase()}`.trim(),
-    );
+    append(`${rest}${text.slice(offset, match.index)}`, restPause);
+    append(match[1].toUpperCase(), speechBeforeSquareMs);
     rest = ranks[Number(match[2]) - 1];
+    restPause = speechGapMs;
     offset = match.index! + match[0].length;
   }
-  const tail = `${rest}${text.slice(offset)}`.trim();
-  if (tail) segments.push(tail);
+  append(`${rest}${text.slice(offset)}`, restPause);
   return segments;
 }
 /** Simple energy-based endpointing for Whisper, with pre-roll and bounded memory. */

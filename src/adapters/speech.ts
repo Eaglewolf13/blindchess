@@ -5,6 +5,7 @@ import type { Model, KaldiRecognizer } from 'vosk-browser';
 import { DEFAULT_SETTINGS, type Settings, type SpeechPreferences } from '../domain/types';
 import { pronunciationSegments, UtteranceBuffer } from './voice-utils';
 import { VoiceCommandAssembler } from '../domain/voice-command';
+import { normalizeSpeechPreferences } from '../domain/speech-preferences';
 
 export class BrowserSpeechOutput implements SpeechOutput {
   private enabled = true;
@@ -16,17 +17,15 @@ export class BrowserSpeechOutput implements SpeechOutput {
   private utterance: SpeechSynthesisUtterance | null = null;
   private preferences: SpeechPreferences = {
     speechPronunciation: DEFAULT_SETTINGS.speechPronunciation,
+    speechBeforeSquareMs: DEFAULT_SETTINGS.speechBeforeSquareMs,
     speechGapMs: DEFAULT_SETTINGS.speechGapMs,
     speechVoice: DEFAULT_SETTINGS.speechVoice,
   };
   configure(preferences: SpeechPreferences) {
-    const next: SpeechPreferences = {
-      speechPronunciation: preferences.speechPronunciation,
-      speechGapMs: Math.max(0, Math.min(300, preferences.speechGapMs)),
-      speechVoice: preferences.speechVoice,
-    };
+    const next = normalizeSpeechPreferences(preferences);
     if (
       next.speechPronunciation !== this.preferences.speechPronunciation ||
+      next.speechBeforeSquareMs !== this.preferences.speechBeforeSquareMs ||
       next.speechGapMs !== this.preferences.speechGapMs ||
       next.speechVoice !== this.preferences.speechVoice
     )
@@ -48,8 +47,8 @@ export class BrowserSpeechOutput implements SpeechOutput {
     if (!this.enabled || !('speechSynthesis' in window)) return;
     this.stop();
     const sequence = this.sequence;
-    const { speechPronunciation, speechGapMs, speechVoice } = this.preferences;
-    const segments = pronunciationSegments(text, speechPronunciation);
+    const { speechVoice } = this.preferences;
+    const segments = pronunciationSegments(text, this.preferences);
     const voices = localEnglishVoices();
     // Prefer an installed voice so speech output also works offline.
     const local =
@@ -64,7 +63,7 @@ export class BrowserSpeechOutput implements SpeechOutput {
         return;
       }
       this.active = true; // Includes the deliberate gap between file and rank.
-      const utterance = new SpeechSynthesisUtterance(segments[index]);
+      const utterance = new SpeechSynthesisUtterance(segments[index].text);
       this.utterance = utterance;
       utterance.lang = local?.lang ?? 'en-US';
       utterance.rate = 0.95;
@@ -73,7 +72,8 @@ export class BrowserSpeechOutput implements SpeechOutput {
         if (sequence !== this.sequence || this.utterance !== utterance) return;
         this.utterance = null;
         if (index + 1 === segments.length) speak(index + 1);
-        else this.pauseTimer = setTimeout(() => speak(index + 1), speechGapMs);
+        else
+          this.pauseTimer = setTimeout(() => speak(index + 1), segments[index + 1].pauseBeforeMs);
       };
       utterance.onerror = () => {
         if (sequence === this.sequence && this.utterance === utterance) this.stop();

@@ -48,7 +48,8 @@ export type Command =
   | { type: 'lastMove' }
   | { type: 'newGame'; mode: GameMode; level: number };
 export interface SpeechPreferences {
-  speechPronunciation: 'letters' | 'letters-spaced' | 'phonetic';
+  speechPronunciation: 'letters' | 'letters-spaced';
+  speechBeforeSquareMs: number;
   speechGapMs: number;
   speechVoice: string;
 }
@@ -69,7 +70,8 @@ export const DEFAULT_SETTINGS: Settings = {
   voiceDebug: false,
   voiceConfidence: 0.5,
   speechPronunciation: 'letters',
-  speechGapMs: 40,
+  speechBeforeSquareMs: 100,
+  speechGapMs: 0,
   speechVoice: '',
   enabledCommands: {
     move: true,

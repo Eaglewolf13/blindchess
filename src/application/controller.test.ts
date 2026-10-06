@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AppController } from './controller';
 import type { ChessEngine, EngineResult, GameRepository, SpeechOutput } from '../ports';
-import type { GameRecord } from '../domain/types';
+import { DEFAULT_SETTINGS, type GameRecord } from '../domain/types';
 
 function fixture() {
   const games: GameRecord[] = [];
@@ -129,8 +129,35 @@ describe('application orchestration', () => {
     expect(f.controller.getSnapshot().settings.enabledCommands.eval).toBe(false);
     expect(f.controller.getSnapshot().settings.speechPronunciation).toBe('letters');
     expect(f.output.configure).toHaveBeenLastCalledWith(
-      expect.objectContaining({ speechPronunciation: 'letters', speechGapMs: 40 }),
+      expect.objectContaining({
+        speechPronunciation: 'letters',
+        speechGapMs: 0,
+        speechBeforeSquareMs: 100,
+      }),
     );
+  });
+  it('retires saved phonetic settings without losing the voice, gaps, or other preferences', async () => {
+    const f = fixture();
+    f.repository.loadSettings = async () =>
+      ({
+        ...DEFAULT_SETTINGS,
+        speechPronunciation: 'phonetic',
+        speechBeforeSquareMs: undefined,
+        speechGapMs: 160,
+        speechVoice: 'installed',
+        voiceConfidence: 0.35,
+        sound: false,
+      }) as unknown as Awaited<ReturnType<GameRepository['loadSettings']>>;
+    await f.controller.initialize();
+    expect(f.controller.getSnapshot().settings).toMatchObject({
+      speechPronunciation: 'letters',
+      speechBeforeSquareMs: 100,
+      speechGapMs: 160,
+      speechVoice: 'installed',
+      voiceConfidence: 0.35,
+      sound: false,
+    });
+    expect(f.output.configure).toHaveBeenLastCalledWith(f.controller.getSnapshot().settings);
   });
   it('applies and saves pronunciation preferences and previews without changing the game', async () => {
     const f = fixture();
@@ -138,13 +165,15 @@ describe('application orchestration', () => {
     await f.controller.initialize();
     const game = f.controller.getSnapshot().game;
     await f.controller.setSettings({
-      speechPronunciation: 'phonetic',
+      speechPronunciation: 'letters-spaced',
+      speechBeforeSquareMs: 120,
       speechGapMs: 0,
       speechVoice: 'installed',
     });
     expect(f.output.configure).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        speechPronunciation: 'phonetic',
+        speechPronunciation: 'letters-spaced',
+        speechBeforeSquareMs: 120,
         speechGapMs: 0,
         speechVoice: 'installed',
       }),

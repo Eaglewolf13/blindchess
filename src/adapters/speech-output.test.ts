@@ -36,35 +36,46 @@ describe('spoken coordinate timing', () => {
     const output = new BrowserSpeechOutput();
     output.say('Black played bishop e3 to f2. King f8 to d8. Pawn a4.');
     expect(spoken.map(({ text }) => text)).toEqual([
-      'Black played bishop E, three to F, two. King F, eight to D, eight. Pawn A, four.',
+      'Black played bishop E three to F two. King F eight to D eight. Pawn A four.',
     ]);
     spoken[0].onend!();
     vi.advanceTimersByTime(1000);
     expect(spoken).toHaveLength(1);
     expect(output.speaking).toBe(false);
   });
-  it('uses the selected extra gap and keeps echo suppression active throughout', () => {
+  it('times the two gaps independently and keeps echo suppression active throughout', () => {
     const output = new BrowserSpeechOutput();
     output.configure({
       ...DEFAULT_SETTINGS,
       speechPronunciation: 'letters-spaced',
+      speechBeforeSquareMs: 120,
       speechGapMs: 40,
     });
     output.say('Pawn a4.');
-    expect(spoken.map((utterance) => utterance.text)).toEqual(['Pawn A']);
+    expect(spoken.map((utterance) => utterance.text)).toEqual(['Pawn']);
     spoken[0].onend!();
-    vi.advanceTimersByTime(39);
+    vi.advanceTimersByTime(119);
     expect(spoken).toHaveLength(1);
     expect(output.speaking).toBe(true);
     vi.advanceTimersByTime(1);
-    expect(spoken[1].text).toBe('four.');
+    expect(spoken[1].text).toBe('A');
     spoken[1].onend!();
+    vi.advanceTimersByTime(39);
+    expect(spoken).toHaveLength(2);
+    expect(output.speaking).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(spoken[2].text).toBe('four.');
+    spoken[2].onend!();
     vi.advanceTimersByTime(351);
     expect(output.speaking).toBe(false);
   });
   it('cancels queued syllables when muted or replaced and ignores old callbacks', () => {
     const output = new BrowserSpeechOutput();
-    output.configure({ ...DEFAULT_SETTINGS, speechPronunciation: 'phonetic', speechGapMs: 160 });
+    output.configure({
+      ...DEFAULT_SETTINGS,
+      speechPronunciation: 'letters-spaced',
+      speechGapMs: 160,
+    });
     output.say('a3');
     spoken[0].onend!();
     output.setEnabled(false);
@@ -77,37 +88,71 @@ describe('spoken coordinate timing', () => {
     old.onend!();
     old.onerror!();
     vi.advanceTimersByTime(1000);
-    expect(spoken.map((utterance) => utterance.text)).toEqual(['ay', 'bee', 'White to move.']);
+    expect(spoken.map((utterance) => utterance.text)).toEqual(['A', 'B', 'White to move.']);
   });
   it('does not duplicate a rank when the same native end callback fires twice', () => {
     const output = new BrowserSpeechOutput();
     output.configure({
       ...DEFAULT_SETTINGS,
       speechPronunciation: 'letters-spaced',
-      speechGapMs: 0,
+      speechBeforeSquareMs: 0,
+      speechGapMs: 40,
     });
     output.say('Bishop e3 to f2.');
     const first = spoken[0];
     first.onend!();
     first.onend!();
-    vi.advanceTimersByTime(0);
+    vi.advanceTimersByTime(40);
     expect(spoken.map(({ text }) => text)).toEqual(['Bishop E', 'three to F']);
     first.onend!();
     first.onerror!();
     spoken[1].onend!();
-    vi.advanceTimersByTime(0);
+    vi.advanceTimersByTime(40);
     expect(spoken.map(({ text }) => text)).toEqual(['Bishop E', 'three to F', 'two.']);
   });
   it('cancels old chunks when pronunciation settings change', () => {
     const output = new BrowserSpeechOutput();
-    output.configure({ ...DEFAULT_SETTINGS, speechPronunciation: 'phonetic' });
+    output.configure({
+      ...DEFAULT_SETTINGS,
+      speechPronunciation: 'letters-spaced',
+      speechGapMs: 40,
+    });
     output.say('a3');
     spoken[0].onend!();
     output.configure(DEFAULT_SETTINGS);
     vi.advanceTimersByTime(1000);
     expect(spoken).toHaveLength(1);
     output.say('a3');
-    expect(spoken[1].text).toBe('A, three');
+    expect(spoken[1].text).toBe('A three');
+  });
+  it('keeps a zero-gap square together while delaying the start of each square', () => {
+    const output = new BrowserSpeechOutput();
+    output.configure({
+      ...DEFAULT_SETTINGS,
+      speechPronunciation: 'letters-spaced',
+      speechBeforeSquareMs: 100,
+      speechGapMs: 0,
+    });
+    output.say('Pawn a2 to a4.');
+    expect(spoken[0].text).toBe('Pawn');
+    spoken[0].onend!();
+    vi.advanceTimersByTime(100);
+    expect(spoken[1].text).toBe('A two to');
+    spoken[1].onend!();
+    vi.advanceTimersByTime(99);
+    expect(spoken).toHaveLength(2);
+    vi.advanceTimersByTime(1);
+    expect(spoken[2].text).toBe('A four.');
+  });
+  it('cancels a pending before-letter gap when that setting changes', () => {
+    const output = new BrowserSpeechOutput();
+    const preferences = { ...DEFAULT_SETTINGS, speechPronunciation: 'letters-spaced' as const };
+    output.configure(preferences);
+    output.say('Pawn a2');
+    spoken[0].onend!();
+    output.configure({ ...preferences, speechBeforeSquareMs: 200 });
+    vi.advanceTimersByTime(1000);
+    expect(spoken).toHaveLength(1);
   });
   it('selects a saved installed voice and falls back if it is missing or remote', () => {
     const us = { voiceURI: 'local-us', localService: true, lang: 'en-US' } as SpeechSynthesisVoice;

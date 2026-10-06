@@ -40,36 +40,53 @@ export function SpeechSettings({
           }
         >
           <option value="letters">Letters · flowing sentence</option>
-          <option value="letters-spaced">Letters · adjustable gap</option>
-          <option value="phonetic">Phonetic spellings · previous method</option>
+          <option value="letters-spaced">Letters · adjustable gaps</option>
         </select>
       </label>
       <p className="muted">
         {settings.speechPronunciation === 'letters'
-          ? 'Reads capital letters, such as “E, three to F, two”, in one sentence. The voice controls the short punctuation pauses; there is no added timer.'
-          : settings.speechPronunciation === 'letters-spaced'
-            ? 'Reads capital letters with a separate rank and an adjustable extra gap. Your system voice may also add a pause.'
-            : 'Uses the earlier ay / bee / see / dee / ee / eff spellings. Some voices spell these out instead. The previous extra gap was 160 ms.'}
+          ? 'Reads “bishop E three to F two” as one sentence, with no commas added inside squares and no added timers.'
+          : 'Adjust the gap before each letter separately from the gap between letter and number. No commas are added. Try 100 ms before the letter and 0 ms between letter and number.'}
       </p>
       {settings.speechPronunciation !== 'letters' && (
-        <label className="confidence-control">
-          Extra letter–number gap: {settings.speechGapMs} ms
-          <input
-            aria-label="Extra letter–number gap"
-            type="range"
-            min="0"
-            max="300"
-            step="20"
-            value={settings.speechGapMs}
-            onChange={(event) =>
-              void controller.setSettings({ speechGapMs: Number(event.target.value) })
-            }
-          />
-          <span className="tiny">
-            Try 0–60 ms first. This is added to the voice’s own pause, so zero may still have a gap.
-            Use the flowing sentence if that pause is too long.
-          </span>
-        </label>
+        <>
+          <label className="confidence-control">
+            Extra gap before letter: {settings.speechBeforeSquareMs} ms
+            <input
+              aria-label="Extra gap before letter"
+              type="range"
+              min="0"
+              max="600"
+              step="20"
+              value={settings.speechBeforeSquareMs}
+              onChange={(event) =>
+                void controller.setSettings({ speechBeforeSquareMs: Number(event.target.value) })
+              }
+            />
+            <span className="tiny">
+              Controls “pawn → A” and “to → A”. Zero keeps the preceding words and letter in the
+              same speech chunk.
+            </span>
+          </label>
+          <label className="confidence-control">
+            Extra letter–number gap: {settings.speechGapMs} ms
+            <input
+              aria-label="Extra letter–number gap"
+              type="range"
+              min="0"
+              max="300"
+              step="20"
+              value={settings.speechGapMs}
+              onChange={(event) =>
+                void controller.setSettings({ speechGapMs: Number(event.target.value) })
+              }
+            />
+            <span className="tiny">
+              Controls “A → two”. Zero keeps “A two” together in one speech chunk. Positive gaps add
+              to the system voice’s own pauses between chunks.
+            </span>
+          </label>
+        </>
       )}
       <label className="recognizer-label">
         Installed English voice
