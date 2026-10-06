@@ -9,5 +9,15 @@ try {
   if (-not $english) { throw 'Install an English US Windows voice to generate this optional fixture.' }
   $testVoice.SelectVoice($english.VoiceInfo.Name)
   $testVoice.SetOutputToWaveFile((Join-Path (Get-Location) 'tests\fixtures\move.wav'))
-  $testVoice.Speak('apex move pawn e two e four')
+  $prompt = New-Object System.Speech.Synthesis.PromptBuilder
+  $prompt.AppendBreak([TimeSpan]::FromMilliseconds(1500))
+  $prompt.AppendText('apex move pawn e two e four')
+  $prompt.AppendBreak([TimeSpan]::FromMilliseconds(2000))
+  $testVoice.Speak($prompt)
+  $testVoice.SetOutputToWaveFile((Join-Path (Get-Location) 'tests\fixtures\last-move.wav'))
+  $lastMove = New-Object System.Speech.Synthesis.PromptBuilder
+  $lastMove.AppendBreak([TimeSpan]::FromMilliseconds(1500))
+  $lastMove.AppendText('apex last move')
+  $lastMove.AppendBreak([TimeSpan]::FromMilliseconds(2000))
+  $testVoice.Speak($lastMove)
 } finally { $testVoice.Dispose() }

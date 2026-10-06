@@ -5,6 +5,27 @@ import { createReadStream, existsSync } from 'node:fs';
 import type { Connect } from 'vite';
 
 const localModel: Connect.NextHandleFunction = (req, res, next) => {
+  const path = req.url?.split('?')[0] ?? '';
+  // Only known, safe model filenames are served from the development cache.
+  if (/^\/models\/(whisper-tiny\.en|whisper-runtime)\/(onnx\/)?[a-zA-Z0-9_.-]+$/.test(path)) {
+    if (!existsSync(`.asset-cache${path}`)) {
+      res.statusCode = 404;
+      res.end();
+      return;
+    }
+    res.setHeader(
+      'Content-Type',
+      path.endsWith('.mjs')
+        ? 'text/javascript'
+        : path.endsWith('.wasm')
+          ? 'application/wasm'
+          : path.endsWith('.json')
+            ? 'application/json'
+            : 'application/octet-stream',
+    );
+    createReadStream(`.asset-cache${path}`).pipe(res);
+    return;
+  }
   if (req.url?.split('?')[0] !== '/models/vosk-en-0.15.tar.gz') return next();
   if (!existsSync('.asset-cache/vosk-en-0.15.tar.gz')) return next();
   res.setHeader('Content-Type', 'application/gzip');
@@ -12,6 +33,7 @@ const localModel: Connect.NextHandleFunction = (req, res, next) => {
 };
 
 export default defineConfig({
+  worker: { format: 'es' },
   plugins: [
     {
       name: 'local-speech-model',
@@ -49,12 +71,17 @@ export default defineConfig({
       workbox: {
         // Models are intentionally downloaded on demand; the app and engine are precached.
         globPatterns: ['**/*.{js,css,html,svg,png,woff2,wasm,json,txt}'],
-        globIgnores: ['models/**'],
+        globIgnores: ['models/**', 'assets/ort-*.wasm'],
         maximumFileSizeToCacheInBytes: 25 * 1024 * 1024,
         navigateFallbackDenylist: [/^\/models\//, /^\/engine\//],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         runtimeCaching: [
+          {
+            urlPattern: /\/models\/whisper-(tiny\.en|runtime)\//,
+            handler: 'CacheOnly',
+            options: { cacheName: 'apex-whisper-v1' },
+          },
           {
             urlPattern: /\/models\/vosk-en-0\.15\.tar\.gz$/,
             handler: 'CacheOnly',

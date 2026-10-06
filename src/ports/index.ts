@@ -4,6 +4,7 @@ import type { GameRecord, Settings } from '../domain/types';
 export interface GameRepository {
   list(): Promise<GameRecord[]>;
   save(game: GameRecord): Promise<void>;
+  delete(id: string): Promise<void>;
   loadSettings(): Promise<Settings | undefined>;
   saveSettings(settings: Settings): Promise<void>;
 }
@@ -27,7 +28,11 @@ export interface SpeechOutput {
   stop(): void;
 }
 export interface SpeechInput {
-  start(onText: (text: string) => void, onStatus: (status: string) => void): Promise<void>;
+  start(
+    onText: (text: string) => Promise<string>,
+    onStatus: (status: string) => void,
+    options: Pick<Settings, 'speechRecognizer' | 'voiceConfidence'>,
+  ): Promise<void>;
   stop(): Promise<void>;
 }
 

@@ -1,11 +1,11 @@
 # Testing
 
-## Verified in this workspace · 5 October 2026
+## Verified in this workspace · 6 October 2026
 
-- TypeScript check and all **29 unit/application tests passed**.
+- TypeScript check and all **38 unit/application tests passed**.
 - Production build passed, including a generated service worker with app, speech runtime, and Stockfish assets.
-- All **5 Chrome integration tests passed**, including an offline engine reply, offline voice-pack loading, and a synthetic microphone utterance that executes `apex move pawn e two e four` through AudioWorklet and Vosk.
-- All **4 WebKit integration tests passed** using the stopped-origin method explained below. This includes cached reload, engine play, and speech-archive retrieval after the test web server is shut down.
+- All **9 Chrome integration tests passed**, covering offline play, both voice packs, resume/last-move commands, deletion, diagnostic settings, and three microphone modes. Restricted Vosk executes the synthetic move; general Vosk safely rejects its mistranscription; Whisper executes a separate synthetic last-move command. These test integration, not human accuracy.
+- All **6 WebKit integration tests passed** using the stopped-origin method explained below. These cover the new UI, deletion, and cached voice resources. With the generated WAV present, the Whisper pack test also runs actual WASM transcription in an offline Worker in both Chrome and WebKit.
 - Desktop and 390-pixel mobile screenshots were inspected. Real iPhone/iPad microphone behavior, background interruptions, and human speech accuracy remain to be checked on devices.
 
 ## Automated checks
@@ -28,9 +28,13 @@ For the optional real audio-pipeline test on Windows, first run `powershell -Exe
 
 For a separate WebKit compatibility check, install `npx playwright install webkit` and run `npm run test:webkit`. This exercises the UI, engine, and service worker in WebKit; it does not claim to emulate iOS microphone hardware or OS permissions. This workspace's downloaded test browser lives at `../.tools/playwright`; set `PLAYWRIGHT_BROWSERS_PATH` to that absolute directory to use it.
 
+The Windows WebKit build does not expose AudioContext. Its Whisper worker test receives PCM decoded by the test runner from the synthetic WAV. This verifies inference and offline loading in WebKit, not microphone capture. Chrome's three voice tests exercise AudioWorklet with a fake microphone. Browser trace outputs use sibling `test-results/chromium` and `test-results/webkit` directories so parallel runs cannot delete each other's traces.
+
 **WebKit test limitation:** Playwright WebKit 2359 has an [upstream offline-emulation defect](https://github.com/microsoft/playwright/issues/42775) that rejects service-worker responses when `setOffline(true)` is used. The WebKit tests instead stop their own static origin server, verify that direct network requests fail, then require the same cached reload, engine, and model behavior. Chrome uses actual Playwright offline emulation. The WebKit result verifies operation without the origin server; it does not verify an iPhone's airplane-mode behavior.
 
 ## Dependency audit
+
+Transformers.js is pinned to 3.8.1 for the tested runtime integration. Its Node-only `sharp` dependency is overridden to patched 0.35.4; image processing is not used by this application or its browser bundle. The final npm install audit reports the two existing moderate Vosk entries below, and no high-severity entries.
 
 The test runner has been updated to a patched release. Two related moderate npm audit entries remain for `vosk-browser` and its pinned `uuid@9` dependency. The [upstream advisory](https://github.com/advisories/GHSA-w5hq-g745-h8pq) concerns v3/v5/v6 calls with caller-provided buffers. The inspected Vosk integration creates recognizer IDs using v4 without external buffers; Apex uses the platform's `crypto.randomUUID` for game IDs. Those vulnerable APIs are not called by this application. The warning is recorded rather than hidden with an override that would leave Vosk's prebundled copy unchanged. Reassess when updating the recognizer library.
 

@@ -29,24 +29,40 @@ export interface GameRecord {
   ownerId: string | null;
   revision: number;
 }
-export type CommandId = 'move' | 'vision' | 'review' | 'next' | 'eval' | 'newGame';
+export type CommandId =
+  | 'move'
+  | 'vision'
+  | 'review'
+  | 'next'
+  | 'eval'
+  | 'newGame'
+  | 'returnToPlay'
+  | 'lastMove';
 export type Command =
   | { type: 'move'; piece: PieceSymbol; from: Square; to: Square; promotion?: Promotion }
   | { type: 'vision'; square: Square }
   | { type: 'review'; move: number }
   | { type: 'next'; count: number }
   | { type: 'eval' }
+  | { type: 'returnToPlay' }
+  | { type: 'lastMove' }
   | { type: 'newGame'; mode: GameMode; level: number };
 export interface Settings {
   sound: boolean;
   requireWakeWord: boolean;
   showBoard: boolean;
+  speechRecognizer: 'vosk' | 'vosk-open' | 'whisper';
+  voiceDebug: boolean;
+  voiceConfidence: number;
   enabledCommands: Record<CommandId, boolean>;
 }
 export const DEFAULT_SETTINGS: Settings = {
   sound: true,
   requireWakeWord: true,
   showBoard: false,
+  speechRecognizer: 'vosk',
+  voiceDebug: false,
+  voiceConfidence: 0.5,
   enabledCommands: {
     move: true,
     vision: true,
@@ -54,6 +70,8 @@ export const DEFAULT_SETTINGS: Settings = {
     next: true,
     eval: true,
     newGame: true,
+    returnToPlay: true,
+    lastMove: true,
   },
 };
 export const PIECE_NAMES: Record<PieceSymbol, string> = {

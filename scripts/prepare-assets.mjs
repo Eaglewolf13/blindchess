@@ -7,6 +7,7 @@ import { pipeline } from 'node:stream/promises';
 import { unzipSync } from 'fflate';
 import tar from 'tar-stream';
 import './generate-icons.mjs';
+import { prepareWhisper } from './prepare-whisper.mjs';
 
 const sha256 = (data) => createHash('sha256').update(data).digest('hex');
 await mkdir('public/engine', { recursive: true });
@@ -85,11 +86,13 @@ for (let offset = 0, i = 0; offset < model.length; offset += chunkSize, i++) {
   await writeFile(`public/models/${filename}`, data);
   parts.push({ url: `/models/${filename}`, bytes: data.length, sha256: sha256(data) });
 }
+const whisper = await prepareWhisper();
 await writeFile(
   'public/asset-manifest.json',
   JSON.stringify(
     {
       version: 1,
+      whisper,
       engine: 'Stockfish 18 lite, single-threaded',
       model: {
         name: 'Vosk small English (US) 0.15',

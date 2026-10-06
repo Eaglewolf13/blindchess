@@ -2522,3 +2522,99 @@ progress {
     font-size: 8px;
   }
 }
+/* Local voice comparison and troubleshooting */
+.voice-diagnostics {
+  padding: 24px;
+  margin-bottom: 24px;
+  min-width: 0;
+}
+.voice-diagnostics h2 {
+  font-size: 19px;
+}
+.voice-meter-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.voice-meter-row meter {
+  flex: 1;
+  max-width: 300px;
+  min-width: 100px;
+  height: 20px;
+  accent-color: #456b52;
+}
+.diagnostic-status,
+.partial-transcript {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.voice-diagnostics summary {
+  cursor: pointer;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.voice-log {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0 0;
+  max-height: 240px;
+  overflow: auto;
+  font-size: 13px;
+}
+.voice-log li {
+  padding: 10px 0;
+  border-top: 1px solid #dedfd5;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow-wrap: anywhere;
+}
+.voice-log time,
+.voice-log small {
+  color: #686d64;
+  font-size: 12px;
+}
+.voice-log q {
+  font-weight: 600;
+}
+.recognizer-label,
+.confidence-control {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 14px;
+  margin: 20px 0;
+}
+.recognizer-label select {
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #d7d9cf;
+  border-radius: 8px;
+  background: #fafaf6;
+  font: inherit;
+}
+.confidence-control input {
+  accent-color: #456b52;
+}
+.voice-settings .button {
+  margin-top: 14px;
+}
+.delete-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+}
+.button.danger {
+  background: #963d36;
+  color: white;
+}
+.delete-game:hover {
+  color: #963d36;
+}
+.repeat-last {
+  margin: 0 24px 16px;
+}

@@ -22,8 +22,9 @@ import {
 } from 'lucide-react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import type { AppController } from './application/controller';
-import type { VoskSpeechInput } from './adapters/speech';
-import { downloadSpeechModel, hasSpeechModel } from './adapters/offline';
+import type { LocalSpeechInput } from './adapters/speech';
+import { downloadSpeechModel, hasSpeechModel, type RecognizerChoice } from './adapters/offline';
+import { VoiceDiagnostics } from './ui/VoiceDiagnostics';
 import { Play } from './ui/Play';
 import { Guide, Library, SettingsPage, savePgn } from './ui/Pages';
 import { NewGameModal, VoiceModal } from './ui/Modal';
@@ -41,7 +42,7 @@ export default function App({
   speech,
 }: {
   controller: AppController;
-  speech: VoskSpeechInput;
+  speech: LocalSpeechInput;
 }) {
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const [page, setPage] = useState<Page>('practice');
@@ -66,9 +67,6 @@ export default function App({
     void controller.initialize();
   }, [controller]);
   useEffect(() => {
-    void hasSpeechModel()
-      .then(setModelReady)
-      .catch(() => {});
     if ('serviceWorker' in navigator && 'caches' in window)
       void navigator.serviceWorker.ready
         .then(async () => {
@@ -100,12 +98,31 @@ export default function App({
       window.removeEventListener('pageshow', returned);
     };
   }, []);
+  useEffect(() => {
+    let cancelled = false;
+    setModelReady(false);
+    void hasSpeechModel(state.settings.speechRecognizer)
+      .then((ready) => {
+        if (!cancelled) setModelReady(ready);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [state.settings.speechRecognizer]);
+  async function selectRecognizer(speechRecognizer: RecognizerChoice) {
+    await speech.stop();
+    setMicOn(false);
+    setMicStatus('Recognizer changed. Enable the microphone to start.');
+    setVoiceError(null);
+    await controller.setSettings({ speechRecognizer });
+  }
   async function download() {
     if (downloadProgress !== null) return;
     setDownloadProgress(0);
     setVoiceError(null);
     try {
-      await downloadSpeechModel(setDownloadProgress);
+      await downloadSpeechModel(setDownloadProgress, state.settings.speechRecognizer);
       setModelReady(true);
     } catch (error) {
       setVoiceError(
@@ -133,13 +150,13 @@ export default function App({
     setMicBusy(true);
     try {
       await speech.start(
-        (text) => {
-          void controller.executeText(text, 'voice');
-        },
+        (text) => controller.executeText(text, 'voice'),
         (status) => {
           setMicStatus(status);
-          if (/stopped|disconnected|suspended/i.test(status)) setMicOn(false);
+          if (/^(Voice input stopped|Microphone (disconnected|suspended))/i.test(status))
+            setMicOn(false);
         },
+        state.settings,
       );
       setMicOn(true);
     } catch (error) {
@@ -307,6 +324,7 @@ export default function App({
               {state.storageError}
             </div>
           )}
+          {state.settings.voiceDebug && <VoiceDiagnostics speech={speech} />}
           {needRefresh && (
             <div className="notice">
               <span>A new version is ready. Your saved games will be kept.</span>
@@ -350,6 +368,10 @@ export default function App({
                   appReady={appReady}
                   downloadProgress={downloadProgress}
                   onDownload={() => void download()}
+                  onRecognizer={(choice) => void selectRecognizer(choice)}
+                  recognizerLocked={micBusy || downloadProgress !== null}
+                  micOn={micOn}
+                  onMic={() => void microphone()}
                 />
               )}
             </>
@@ -397,6 +419,7 @@ export default function App({
       )}
       {voiceOpen && (
         <VoiceModal
+          recognizer={state.settings.speechRecognizer}
           onClose={() => setVoiceOpen(false)}
           ready={modelReady}
           error={voiceError}

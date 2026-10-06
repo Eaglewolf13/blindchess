@@ -28,6 +28,7 @@ export interface AppState {
   evaluation: string | null;
   feedback: { text: string; kind: 'info' | 'success' | 'error'; id: number };
   storageError: string | null;
+  deletingGameId: string | null;
 }
 
 export class AppController {
@@ -45,6 +46,7 @@ export class AppController {
     busy: null,
     evaluation: null,
     storageError: null,
+    deletingGameId: null,
     feedback: { text: 'Your board is ready. Make the first move.', kind: 'info', id: 0 },
   };
   constructor(
@@ -164,11 +166,41 @@ export class AppController {
     }
   }
   returnToPlay() {
+    if (!this.state.settings.enabledCommands.returnToPlay) {
+      this.message('Return to play is disabled in practice settings.', 'error');
+      return;
+    }
     this.update({ reviewPly: null, evaluation: null });
     this.message(
       this.session.record.resultText ?? `${colorName(this.session.chess.turn())} to move.`,
     );
     void this.maybeEngineMove();
+  }
+  async deleteGame(id: string): Promise<boolean> {
+    if (this.state.deletingGameId) return false;
+    this.update({ deletingGameId: id });
+    if (this.session.record.id === id) {
+      ++this.epoch;
+      this.engine.cancel();
+      this.output.stop();
+      this.update({ busy: null });
+    }
+    try {
+      await this.repository.delete(id);
+      if (this.session.record.id === id) {
+        this.session = new GameSession(newRecord({ mode: 'self', level: 3, playerColor: 'w' }));
+        this.update({ reviewPly: null, evaluation: null });
+      }
+      this.update({ games: this.state.games.filter((game) => game.id !== id) });
+      this.message('Game deleted from this device.');
+      return true;
+    } catch {
+      this.message('This game could not be deleted. Please try again.', 'error');
+      return false;
+    } finally {
+      this.update({ deletingGameId: null });
+      void this.maybeEngineMove();
+    }
   }
   seek(ply: number) {
     if (!this.state.settings.enabledCommands.review) {
@@ -193,18 +225,22 @@ export class AppController {
     if (!command) {
       if (source === 'text' || /^apex\b/i.test(text.trim()))
         this.message('Command not recognized. Try “apex move pawn e two e four”.', 'error');
-      return;
+      return /^apex\b/i.test(text.trim()) || source === 'text'
+        ? 'Not executed: the words did not match a complete command.'
+        : 'Ignored: no complete command with the required wake word.';
     }
-    await this.execute(command);
+    return this.execute(command);
   }
   async execute(command: Command) {
     if (!this.state.settings.enabledCommands[command.type]) {
       this.message('That command is disabled in practice settings.', 'error');
-      return;
+      return 'Not executed: command disabled in Settings.';
     }
     try {
       switch (command.type) {
         case 'move': {
+          if (this.state.deletingGameId === this.session.record.id)
+            throw new Error('This game is being deleted. Please wait.');
           if (this.state.reviewPly !== null)
             throw new Error('You are reviewing. Return to play before making a move.');
           if (this.state.busy) throw new Error('Stockfish is thinking. Please wait a moment.');
@@ -221,6 +257,18 @@ export class AppController {
           );
           await this.save();
           void this.maybeEngineMove();
+          break;
+        }
+        case 'returnToPlay':
+          this.returnToPlay();
+          break;
+        case 'lastMove': {
+          const move = this.session.record.moves.at(-1);
+          const turn =
+            this.session.record.resultText ?? `${colorName(this.session.chess.turn())} to move.`;
+          this.message(
+            `${move ? `${colorName(move.color)} played ${describeMove(move)}.` : 'No moves have been played.'} ${turn}${this.state.reviewPly !== null ? ' You are in review mode.' : ''}`,
+          );
           break;
         }
         case 'vision': {
@@ -287,8 +335,10 @@ export class AppController {
           });
           break;
       }
+      return `Handled: ${command.type}.`;
     } catch (error) {
       this.reportError(error);
+      return `Not executed: ${error instanceof Error ? error.message : 'Command failed.'}`;
     }
   }
   async maybeEngineMove() {
@@ -298,7 +348,8 @@ export class AppController {
       this.session.record.result ||
       this.session.chess.turn() === config.playerColor ||
       this.state.busy ||
-      this.state.reviewPly !== null
+      this.state.reviewPly !== null ||
+      this.state.deletingGameId === this.session.record.id
     )
       return;
     const epoch = this.epoch;

@@ -1,4 +1,32 @@
 import { test, expect } from './fixtures';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+
+function pcmFixture(path: string) {
+  const wav = readFileSync(path);
+  let rate = 0,
+    data: Buffer | undefined;
+  for (let offset = 12; offset + 8 <= wav.length; ) {
+    const kind = wav.toString('ascii', offset, offset + 4);
+    const size = wav.readUInt32LE(offset + 4);
+    const start = offset + 8;
+    if (kind === 'fmt ') {
+      if (
+        wav.readUInt16LE(start) !== 1 ||
+        wav.readUInt16LE(start + 2) !== 1 ||
+        wav.readUInt16LE(start + 14) !== 16
+      )
+        throw new Error('The speech fixture must be mono PCM16.');
+      rate = wav.readUInt32LE(start + 4);
+    }
+    if (kind === 'data') data = wav.subarray(start, start + size);
+    offset = start + size + (size % 2);
+  }
+  if (!data || !rate) throw new Error('Invalid WAV fixture.');
+  return {
+    rate,
+    samples: Array.from({ length: data.length / 2 }, (_, i) => data!.readInt16LE(i * 2) / 32768),
+  };
+}
 
 async function command(page: import('@playwright/test').Page, text: string) {
   await page.getByLabel('Type a command').fill(text);
@@ -69,6 +97,125 @@ test('responsive layout has no horizontal overflow', async ({ page }) => {
   await page.screenshot({ path: 'test-results/mobile-practice.png', fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1050 });
   await page.screenshot({ path: 'test-results/desktop-practice.png', fullPage: true });
+});
+
+test('resume and last-move commands, safe deletion, and voice settings survive reload', async ({
+  page,
+}) => {
+  await command(page, 'move pawn a2 a3');
+  await page.getByRole('button', { name: 'My games', exact: true }).click();
+  await page.getByRole('button', { name: 'Review', exact: true }).click();
+  await command(page, 'apex last move');
+  await expect(page.locator('.feedback')).toContainText(
+    'White played pawn a 2 to a 3. Black to move.',
+  );
+  await command(page, 'apex return to play');
+  await command(page, 'move pawn a7 a6');
+  await expect(page.locator('.count-pill')).toHaveText('2');
+  await page.getByRole('button', { name: 'Repeat last move', exact: true }).click();
+  await expect(page.locator('.feedback')).toContainText(
+    'Black played pawn a 7 to a 6. White to move.',
+  );
+  await page.getByRole('button', { name: 'My games', exact: true }).click();
+  await page.getByRole('button', { name: 'Delete game', exact: true }).click();
+  await page.getByRole('button', { name: 'Keep game', exact: true }).click();
+  await expect(page.locator('.saved-game')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Delete game', exact: true }).click();
+  await page.getByRole('button', { name: 'Delete permanently', exact: true }).click();
+  await expect(page.locator('.saved-game')).toHaveCount(0);
+  await page.reload();
+  await expect(page.locator('.count-pill')).toHaveText('0');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByLabel('Local recognizer', { exact: true }).selectOption('vosk-open');
+  await page.getByRole('checkbox', { name: /Voice debug mode/ }).check();
+  await expect(page.getByRole('region', { name: 'Voice diagnostics' })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/mobile-voice-settings.png', fullPage: true });
+  await page.reload();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.getByLabel('Local recognizer', { exact: true })).toHaveValue('vosk-open');
+  await expect(page.getByRole('checkbox', { name: /Voice debug mode/ })).toBeChecked();
+});
+
+test('Whisper pack survives offline reload with its local model and runtime intact', async ({
+  page,
+  disconnectOrigin,
+}) => {
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await page.getByLabel('Local recognizer', { exact: true }).selectOption('whisper');
+  await page.getByRole('button', { name: 'Download voice pack', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Voice pack ready', exact: true })).toBeVisible({
+    timeout: 60000,
+  });
+  await expect(page.getByText('Ready offline', { exact: true })).toBeVisible();
+  await page.reload();
+  await disconnectOrigin();
+  await page.reload();
+  const results = await page.evaluate(async () => {
+    const urls = [
+      '/models/whisper-tiny.en/config.json',
+      '/models/whisper-tiny.en/onnx/encoder_model_quantized.onnx',
+      '/models/whisper-tiny.en/onnx/decoder_model_merged_quantized.onnx',
+      '/models/whisper-runtime/ort-wasm-simd-threaded.jsep.mjs',
+      '/models/whisper-runtime/ort-wasm-simd-threaded.jsep.wasm',
+    ];
+    return Promise.all(
+      urls.map(async (url) => {
+        const response = await fetch(url);
+        return { ok: response.ok, bytes: (await response.arrayBuffer()).byteLength };
+      }),
+    );
+  });
+  expect(results.every((file) => file.ok && file.bytes > 100)).toBe(true);
+  if (existsSync('tests/fixtures/last-move.wav')) {
+    // Test the actual offline WASM worker in both engines without real mic hardware.
+    const workerFile = readdirSync('dist/assets').find((name) =>
+      name.startsWith('whisper.worker-'),
+    )!;
+    const audio = pcmFixture('tests/fixtures/last-move.wav');
+    const transcript = await page.evaluate(
+      async ({ workerFile, audio }) => {
+        const worker = new Worker(`/assets/${workerFile}`, { type: 'module' });
+        try {
+          return await new Promise<string>((resolve, reject) => {
+            const timer = setTimeout(
+              () => reject(new Error('Offline Whisper worker timed out.')),
+              60000,
+            );
+            worker.onmessage = ({ data }) => {
+              if (data.type === 'ready') {
+                const samples = Float32Array.from(audio.samples);
+                worker.postMessage({ type: 'audio', samples, rate: audio.rate }, [samples.buffer]);
+              } else if (data.type === 'result') {
+                clearTimeout(timer);
+                resolve(data.text);
+              } else if (data.type === 'error') {
+                clearTimeout(timer);
+                reject(new Error(data.error));
+              }
+            };
+            worker.onerror = () => {
+              clearTimeout(timer);
+              reject(new Error('Offline worker failed.'));
+            };
+            worker.postMessage({ type: 'load' });
+          });
+        } finally {
+          worker.terminate();
+        }
+      },
+      { workerFile, audio },
+    );
+    expect(
+      transcript
+        .toLowerCase()
+        .replace(/[.,!?]/g, '')
+        .trim(),
+    ).toBe('apex last move');
+  }
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Voice pack ready', exact: true })).toBeVisible();
 });
 test('voice pack is cached, verified and available after an offline reload', async ({
   page,

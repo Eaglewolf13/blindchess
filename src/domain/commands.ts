@@ -158,6 +158,21 @@ export const COMMANDS: CommandDefinition[] = [
     },
   },
   {
+    id: 'returnToPlay',
+    label: 'Return to play',
+    example: 'apex return to play',
+    description: 'Leave review and resume the open game at its latest position.',
+    match: (text) => (text === 'return to play' ? { type: 'returnToPlay' } : null),
+  },
+  {
+    id: 'lastMove',
+    label: 'Last move',
+    example: 'apex last move',
+    description:
+      'Repeat the latest move in the open game, its color, and whose turn comes next. Also works during review.',
+    match: (text) => (text === 'last move' ? { type: 'lastMove' } : null),
+  },
+  {
     id: 'eval',
     label: 'Current evaluation',
     example: 'apex current eval',
@@ -193,6 +208,9 @@ export function speechVocabulary(): string[] {
   // [unk] gives the recognizer an escape route for background conversation.
   return [
     'apex',
+    'return',
+    'play',
+    'last',
     'move',
     'pawn',
     'knight',

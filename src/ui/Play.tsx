@@ -107,11 +107,16 @@ export function Play({
             <section className="card review-card">
               <div className="section-heading">
                 <h2>Walk through the game</h2>
-                <button className="text-button" onClick={() => controller.returnToPlay()}>
+                <button
+                  className="text-button"
+                  disabled={!settings.enabledCommands.returnToPlay}
+                  onClick={() => controller.returnToPlay()}
+                >
                   {game.result ? 'Leave review' : 'Return to play'}
                   <ArrowRight size={15} />
                 </button>
               </div>
+              <p className="tiny">Say “apex return to play” to resume at the latest position.</p>
               <div className="review-navigation">
                 <button
                   className="icon-button"
@@ -194,7 +199,15 @@ export function Play({
               <span className="small-caps">VOICE COMPANION</span>
               <span className="voice-state">
                 <i className="status-dot" />
-                {micBusy ? 'Starting' : micOn ? 'Listening' : 'Ready when you are'}
+                {micBusy
+                  ? 'Starting'
+                  : micOn
+                    ? /Transcribing/.test(micStatus)
+                      ? 'Transcribing'
+                      : /Announcement/.test(micStatus)
+                        ? 'Speaking'
+                        : 'Listening'
+                    : 'Ready when you are'}
               </span>
             </div>
             <div className={`sound-wave ${micOn ? 'active' : ''}`} aria-hidden="true">
@@ -232,6 +245,13 @@ export function Play({
               <h2>Move journal</h2>
               <span className="count-pill">{game.moves.length}</span>
             </div>
+            <button
+              className="text-button repeat-last"
+              disabled={!settings.enabledCommands.lastMove}
+              onClick={() => void controller.execute({ type: 'lastMove' })}
+            >
+              Repeat last move
+            </button>
             <div className="journal-head">
               <span>#</span>
               <span>White</span>

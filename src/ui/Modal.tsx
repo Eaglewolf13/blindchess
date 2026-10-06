@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowRight, Download, LoaderCircle, Mic, X } from 'lucide-react';
 import type { GameConfig, GameMode } from '../domain/types';
+import { RECOGNIZERS, type RecognizerChoice } from '../adapters/offline';
 
 export function Modal({
   title,
@@ -142,6 +143,7 @@ export function NewGameModal({
   );
 }
 export function VoiceModal({
+  recognizer,
   onClose,
   ready,
   error,
@@ -149,6 +151,7 @@ export function VoiceModal({
   onDownload,
   onStart,
 }: {
+  recognizer: RecognizerChoice;
   onClose: () => void;
   ready: boolean;
   error: string | null;
@@ -166,8 +169,8 @@ export function VoiceModal({
         this device—even offline.
       </p>
       <div className="download-detail">
-        <span>English · US</span>
-        <strong>{ready ? 'Ready to listen' : '39.8 MB'}</strong>
+        <span>{RECOGNIZERS[recognizer].label}</span>
+        <strong>{ready ? 'Ready to listen' : RECOGNIZERS[recognizer].size}</strong>
       </div>
       <p className="tiny">
         Allow microphone access when prompted. Keep the app open while playing. You can pause

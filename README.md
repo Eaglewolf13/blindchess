@@ -12,7 +12,7 @@ npm run assets
 npm run dev
 ```
 
-Open the localhost URL printed in the terminal. `npm run assets` prepares Stockfish and downloads the **39.8 MiB** English voice model from Vosk's official server. The model is checksum-verified on subsequent setups. It is split into files under 25 MiB for inexpensive static hosting. The running app makes no third-party model requests.
+Open the localhost URL printed in the terminal. `npm run assets` prepares Stockfish, the **39.8 MiB Vosk** English model, and a **62.2 MiB Whisper tiny.en pack** including its WASM runtime. Downloads are pinned and checksum-verified. Models are split into files under 25 MiB for inexpensive static hosting. The running app makes no third-party model requests; players download only the packs they choose.
 
 On this Windows workspace, a portable Node installation is also available in the **parent folder's `.tools` directory**. The supplied runner discovers it, without changing your system PATH:
 
@@ -28,7 +28,16 @@ Open **this directory** (`blindchess/blindchess`, containing `package.json`) as 
 2. Use the Piece / From / To selectors, or type `move pawn e2 e4` in the command bar.
 3. For voice, select **Enable microphone**, download the voice pack, then select **Enable microphone** again and allow browser access. Say **“apex move pawn e two e four”** in one utterance.
 4. The microphone keeps listening while the app is active. The microphone button pauses/resumes it. The speaker button separately mutes announcements.
-5. Games save after every move. **My games** opens them for visual or spoken review and PGN export. An unfinished game can be resumed with **Return to play**.
+5. Games save after every move. **My games** opens them for visual or spoken review and PGN export. Resume with **Return to play** or **“apex return to play.”** The trash button deletes an individual game after confirmation, with an option to export first.
+6. Missed an announcement? Say **“apex last move”** or select **Repeat last move**. It repeats the latest actual move in the open game, its color, and the next turn. In review it still refers to the live game and tells you that review is active.
+
+## Comparing voice recognition
+
+Open **Settings → Voice recognition**. Choose **Vosk · chess vocabulary** (default), **Vosk · general English** (same pack), or **Whisper · tiny English** (separate pack). Switching pauses the microphone; download the selected pack if needed, then choose **Start voice test**. All three run locally, including offline after preparation.
+
+Enable **Voice debug mode** to see microphone level, Vosk draft transcripts, final transcripts, each provider's name, Vosk word scores, and the command decision. A draft never executes a command. Whisper reports completed transcripts and processing time, not invented confidence scores. Logs contain at most 60 events, stay in memory, and can be cleared; no microphone audio is saved. See [voice testing](docs/VOICE.md) for interpretation and comparison steps.
+
+Both alternatives are experimental, not promised accuracy upgrades. General English can mishear square names; Whisper tiny can merge words or omit squares. Neither is allowed to guess a missing piece/square. Whisper waits for about 0.9 seconds of silence, processes one utterance at a time, and asks you to wait during transcription. The microphone stays open, but speech during transcription or spoken announcements is not accepted. Muting spoken responses removes announcement pauses. Actual accuracy depends on your voice and device.
 
 Browser permissions require a deliberate microphone activation. The app cannot silently enable your microphone on the first visit. On mobile, keep the app in the foreground; locking the device or switching apps can suspend audio. The app reports suspension and offers reconnection.
 
@@ -46,11 +55,13 @@ Spoken commands require the `apex` prefix by default. Typed commands accept it o
 | `apex review ten`                                  | Announce White's tenth move.                                                            |
 | `apex next`                                        | Advance one individual move (one ply).                                                  |
 | `apex next three`                                  | Advance three plies, then announce the resulting move.                                  |
+| `apex return to play`                              | Exit review and resume the latest position.                                             |
+| `apex last move`                                   | Repeat the open game's latest move, color, and next turn (or game result).              |
 | `apex current eval`                                | Evaluate the displayed position at maximum local engine skill.                          |
 | `apex new game self`                               | Start self play after the game ends, or from an untouched starting position.            |
 | `apex new game engine three`                       | Start an engine game at level 3. Easy / medium / strong / full power are also accepted. |
 
-Commands are full-utterance matches: ordinary conversation is not searched for embedded commands. The recognizer uses a small vocabulary, an unknown-word escape, and word-confidence filtering. These reduce accidental activation, but recognition accuracy must still be checked with real microphones and accents. Audio is processed locally. The recognizer is fed silence during the app's own narration to avoid feedback loops; speak after an announcement finishes.
+Commands are full-utterance matches: ordinary conversation is not searched for embedded commands. The default recognizer uses a small vocabulary, an unknown-word escape, and word-confidence filtering. Debug mode exposes the configurable Vosk threshold (50% by default); lowering it increases accidental-command risk. Rejected utterances beginning with “apex” also get an audible retry message when sound is enabled. Audio is processed locally. Input is suppressed during the app's narration to avoid feedback loops; the status explains this. Square letters use phonetic spellings for synthesis, so `a3` is spoken as “ay three” while screen text stays unchanged.
 
 ## Offline use and installation
 

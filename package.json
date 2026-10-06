@@ -15,7 +15,13 @@
     "check": "tsc -b && vitest run",
     "format": "prettier --write --ignore-unknown src scripts tests docs *.ts *.json *.md"
   },
+  "overrides": {
+    "@huggingface/transformers": {
+      "sharp": "0.35.4"
+    }
+  },
   "dependencies": {
+    "@huggingface/transformers": "3.8.1",
     "chess.js": "^1.4.0",
     "idb": "^8.0.3",
     "lucide-react": "^0.468.0",

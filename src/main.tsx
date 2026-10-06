@@ -3,12 +3,12 @@ import App from './App';
 import { AppController } from './application/controller';
 import { IndexedDbRepository } from './adapters/storage';
 import { StockfishEngine } from './adapters/engine';
-import { BrowserSpeechOutput, VoskSpeechInput } from './adapters/speech';
+import { BrowserSpeechOutput, LocalSpeechInput } from './adapters/speech';
 import './styles.css';
 
 const output = new BrowserSpeechOutput();
 const engine = new StockfishEngine();
-const input = new VoskSpeechInput(output);
+const input = new LocalSpeechInput(output);
 const controller = new AppController(new IndexedDbRepository(), engine, output);
 window.addEventListener('pagehide', () => {
   void input.stop();

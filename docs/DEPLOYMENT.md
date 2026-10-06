@@ -10,9 +10,11 @@ The first release has no server runtime or secrets. Build `dist/` and serve it o
 4. Use build command `npm ci && npm run assets && npm run build` and output directory `dist`.
 5. Deploy. Open the HTTPS URL and verify microphone access, offline readiness, an engine move, and a voice command.
 
-The English model is downloaded at build time from its upstream publisher. Cache `.asset-cache` in CI if supported. Do not commit the expanded npm dependencies or model files. The model download is pinned by `scripts/model-checksum.json` once initially prepared.
+Both English models are downloaded at build time from their upstream publishers. Cache `.asset-cache` in CI if supported. Do not commit expanded dependencies or model files. Vosk is pinned by `scripts/model-checksum.json`; Whisper's repository revision and file hashes are pinned by `scripts/whisper-checksums.json`.
 
 The model's two `.bin` files are below Cloudflare Pages' 25 MiB per-file limit. Stockfish uses a 7 MB single-threaded build, so cross-origin-isolation headers and SharedArrayBuffer are not required. Large model parts are fetched only when a user asks to prepare voice, then assembled locally. The Vosk virtual archive URL is served from Cache Storage by the service worker.
+
+Whisper's files are similarly split into 20 MiB parts and reassembled in a separate cache. The service worker serves its JSON, ONNX, and runtime resources under `/models/whisper-tiny.en/` and `/models/whisper-runtime/`, including correct JavaScript and WASM MIME types. Do not replace these virtual paths with an HTML fallback. Whisper uses one WASM thread and requires no external inference API.
 
 Keep `public/_headers` in the build: it configures long-lived hashed assets, fresh service-worker/manifest requests, MIME sniffing protection, and microphone access for the same origin. Other hosting providers may need equivalent header configuration.
 
