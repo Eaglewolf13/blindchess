@@ -28,4 +28,10 @@ try {
   $pausedMove.AppendText('e four')
   $pausedMove.AppendBreak([TimeSpan]::FromMilliseconds(2500))
   $testVoice.Speak($pausedMove)
+  $testVoice.SetOutputToWaveFile((Join-Path (Get-Location) 'tests\fixtures\resume-game.wav'))
+  $resumeGame = New-Object System.Speech.Synthesis.PromptBuilder
+  $resumeGame.AppendBreak([TimeSpan]::FromMilliseconds(1500))
+  $resumeGame.AppendText('apex resume game')
+  $resumeGame.AppendBreak([TimeSpan]::FromMilliseconds(2500))
+  $testVoice.Speak($resumeGame)
 } finally { $testVoice.Dispose() }

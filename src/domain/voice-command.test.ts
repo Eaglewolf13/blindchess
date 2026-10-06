@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { VoiceCommandAssembler } from './voice-command';
-import { COMMANDS, parseCommand } from './commands';
+import { COMMANDS, parseCommand, speechVocabulary } from './commands';
 import { voiceTokens } from './voice-grammar';
 
 const options = { requireWakeWord: true, voiceConfidence: 0.5 };
@@ -8,6 +8,15 @@ function speak(assembler: VoiceCommandAssembler, text: string) {
   return assembler.accept(text, undefined, options);
 }
 describe('voice commands assembled from slots', () => {
+  it('resumes with the new phrase across a pause and retires the old spoken phrase', () => {
+    const assembler = new VoiceCommandAssembler();
+    expect(speak(assembler, 'apex resume').pending).toBe('apex resume');
+    expect(parseCommand(speak(assembler, 'game').commandText!)).toEqual({ type: 'returnToPlay' });
+    expect(speak(assembler, 'apex return to play').kind).toBe('pending');
+    expect(speechVocabulary()).toContain('resume');
+    expect(speechVocabulary()).not.toContain('return');
+    expect(parseCommand('return to play')).toEqual({ type: 'returnToPlay' });
+  });
   it.each([
     'Apex Move Bond A2A3',
     'Apex Move Pawn A2A3',

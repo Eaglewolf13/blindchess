@@ -192,11 +192,13 @@ export const COMMANDS: CommandDefinition[] = [
   },
   {
     id: 'returnToPlay',
-    label: 'Return to play',
-    example: 'apex return to play',
+    label: 'Resume game',
+    example: 'apex resume game',
     description: 'Leave review and resume the open game at its latest position.',
-    voice: [[literal('return'), literal('to'), literal('play')]],
-    match: (text) => (text === 'return to play' ? { type: 'returnToPlay' } : null),
+    voice: [[literal('resume'), literal('game')]],
+    // Keep the former phrase as a typed alias; it is no longer in the spoken grammar.
+    match: (text) =>
+      text === 'resume game' || text === 'return to play' ? { type: 'returnToPlay' } : null,
   },
   {
     id: 'lastMove',
@@ -253,8 +255,7 @@ export function speechVocabulary(): string[] {
   // [unk] gives the recognizer an escape route for background conversation.
   return [
     'apex',
-    'return',
-    'play',
+    'resume',
     'last',
     'move',
     'pawn',

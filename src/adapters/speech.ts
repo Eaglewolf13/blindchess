@@ -2,7 +2,7 @@ import { speechVocabulary } from '../domain/commands';
 import type { SpeechInput, SpeechOutput } from '../ports';
 import { speechModelUrl, RECOGNIZERS } from './offline';
 import type { Model, KaldiRecognizer } from 'vosk-browser';
-import type { Settings } from '../domain/types';
+import { DEFAULT_SETTINGS, type Settings, type SpeechPreferences } from '../domain/types';
 import { pronunciationSegments, UtteranceBuffer } from './voice-utils';
 import { VoiceCommandAssembler } from '../domain/voice-command';
 
@@ -12,6 +12,27 @@ export class BrowserSpeechOutput implements SpeechOutput {
   private sequence = 0;
   private active = false;
   private pauseTimer: ReturnType<typeof setTimeout> | undefined;
+  // Keep the active utterance alive and make duplicate native callbacks harmless.
+  private utterance: SpeechSynthesisUtterance | null = null;
+  private preferences: SpeechPreferences = {
+    speechPronunciation: DEFAULT_SETTINGS.speechPronunciation,
+    speechGapMs: DEFAULT_SETTINGS.speechGapMs,
+    speechVoice: DEFAULT_SETTINGS.speechVoice,
+  };
+  configure(preferences: SpeechPreferences) {
+    const next: SpeechPreferences = {
+      speechPronunciation: preferences.speechPronunciation,
+      speechGapMs: Math.max(0, Math.min(300, preferences.speechGapMs)),
+      speechVoice: preferences.speechVoice,
+    };
+    if (
+      next.speechPronunciation !== this.preferences.speechPronunciation ||
+      next.speechGapMs !== this.preferences.speechGapMs ||
+      next.speechVoice !== this.preferences.speechVoice
+    )
+      this.stop();
+    this.preferences = next;
+  }
   get speaking() {
     return (
       this.active ||
@@ -27,12 +48,14 @@ export class BrowserSpeechOutput implements SpeechOutput {
     if (!this.enabled || !('speechSynthesis' in window)) return;
     this.stop();
     const sequence = this.sequence;
-    const segments = pronunciationSegments(text);
-    const voices = speechSynthesis.getVoices();
+    const { speechPronunciation, speechGapMs, speechVoice } = this.preferences;
+    const segments = pronunciationSegments(text, speechPronunciation);
+    const voices = localEnglishVoices();
     // Prefer an installed voice so speech output also works offline.
     const local =
-      voices.find((voice) => voice.localService && voice.lang === 'en-US') ??
-      voices.find((voice) => voice.localService && voice.lang.startsWith('en'));
+      voices.find((voice) => voice.voiceURI === speechVoice) ??
+      voices.find((voice) => voice.lang.toLowerCase() === 'en-us') ??
+      voices[0];
     const speak = (index: number) => {
       if (sequence !== this.sequence) return;
       if (index >= segments.length) {
@@ -42,16 +65,18 @@ export class BrowserSpeechOutput implements SpeechOutput {
       }
       this.active = true; // Includes the deliberate gap between file and rank.
       const utterance = new SpeechSynthesisUtterance(segments[index]);
-      utterance.lang = 'en-US';
+      this.utterance = utterance;
+      utterance.lang = local?.lang ?? 'en-US';
       utterance.rate = 0.95;
       if (local) utterance.voice = local;
       utterance.onend = () => {
-        if (sequence !== this.sequence) return;
+        if (sequence !== this.sequence || this.utterance !== utterance) return;
+        this.utterance = null;
         if (index + 1 === segments.length) speak(index + 1);
-        else this.pauseTimer = setTimeout(() => speak(index + 1), 160);
+        else this.pauseTimer = setTimeout(() => speak(index + 1), speechGapMs);
       };
       utterance.onerror = () => {
-        if (sequence === this.sequence) this.stop();
+        if (sequence === this.sequence && this.utterance === utterance) this.stop();
       };
       speechSynthesis.speak(utterance);
     };
@@ -61,9 +86,18 @@ export class BrowserSpeechOutput implements SpeechOutput {
     ++this.sequence;
     clearTimeout(this.pauseTimer);
     this.active = false;
+    this.utterance = null;
     if ('speechSynthesis' in window) speechSynthesis.cancel();
     this.muteUntil = performance.now() + 350;
   }
+}
+
+/** Only installed English voices are offered; no remote voice is selected by this picker. */
+export function localEnglishVoices(): SpeechSynthesisVoice[] {
+  if (!('speechSynthesis' in window)) return [];
+  return speechSynthesis
+    .getVoices()
+    .filter((voice) => voice.localService && /^en(?:-|$)/i.test(voice.lang));
 }
 
 /** Offline recognition in a worker; capture uses AudioWorklet (including Safari). */

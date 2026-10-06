@@ -98,6 +98,7 @@ export class AppController {
         enabledCommands: { ...DEFAULT_SETTINGS.enabledCommands, ...settings?.enabledCommands },
       };
       this.output.setEnabled(restored.sound);
+      this.output.configure(restored);
       this.update({ ready: true, games, settings: restored });
       void this.maybeEngineMove();
     } catch {
@@ -123,12 +124,21 @@ export class AppController {
   async setSettings(patch: Partial<Settings>) {
     const settings = { ...this.state.settings, ...patch };
     this.output.setEnabled(settings.sound);
+    this.output.configure(settings);
     this.update({ settings });
     try {
       await this.repository.saveSettings(settings);
     } catch {
       this.update({ storageError: 'Settings could not be saved in this browser.' });
     }
+  }
+  previewSpeech() {
+    this.output.say(
+      'White played pawn a 2 to a 4. Black played bishop e 3 to f 2. King f 8 to d 8.',
+    );
+  }
+  stopSpeechPreview() {
+    this.output.stop();
   }
   async startGame(config: GameConfig) {
     if (!this.state.settings.enabledCommands.newGame) {
@@ -160,14 +170,16 @@ export class AppController {
       this.output.stop();
       this.session = session;
       this.update({ reviewPly: record.moves.length, busy: null, evaluation: null });
-      this.message(record.resultText ?? 'Saved game opened. Review the moves or return to play.');
+      this.message(
+        record.resultText ?? 'Saved game opened. Review the moves or say apex resume game.',
+      );
     } catch {
       this.message('This saved game could not be opened.', 'error');
     }
   }
   returnToPlay() {
     if (!this.state.settings.enabledCommands.returnToPlay) {
-      this.message('Return to play is disabled in practice settings.', 'error');
+      this.message('Resume game is disabled in practice settings.', 'error');
       return;
     }
     this.update({ reviewPly: null, evaluation: null });
@@ -242,7 +254,7 @@ export class AppController {
           if (this.state.deletingGameId === this.session.record.id)
             throw new Error('This game is being deleted. Please wait.');
           if (this.state.reviewPly !== null)
-            throw new Error('You are reviewing. Return to play before making a move.');
+            throw new Error('You are reviewing. Say apex resume game before making a move.');
           if (this.state.busy) throw new Error('Stockfish is thinking. Please wait a moment.');
           const { config } = this.session.record;
           if (config.mode === 'engine' && this.session.chess.turn() !== config.playerColor)

@@ -112,11 +112,11 @@ export function Play({
                   disabled={!settings.enabledCommands.returnToPlay}
                   onClick={() => controller.returnToPlay()}
                 >
-                  {game.result ? 'Leave review' : 'Return to play'}
+                  {game.result ? 'Leave review' : 'Resume game'}
                   <ArrowRight size={15} />
                 </button>
               </div>
-              <p className="tiny">Say “apex return to play” to resume at the latest position.</p>
+              <p className="tiny">Say “apex resume game” to resume at the latest position.</p>
               <div className="review-navigation">
                 <button
                   className="icon-button"

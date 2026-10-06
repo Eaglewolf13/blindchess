@@ -1,5 +1,10 @@
-/** Phonetic file names are for synthesis only; screen text and PGN remain unchanged. */
-export function pronunciationSegments(text: string): string[] {
+import type { SpeechPreferences } from '../domain/types';
+
+/** Synthesis-only formatting; screen text and PGN remain unchanged. */
+export function pronunciationSegments(
+  text: string,
+  mode: SpeechPreferences['speechPronunciation'] = 'letters',
+): string[] {
   const files: Record<string, string> = {
     a: 'ay',
     b: 'bee',
@@ -11,12 +16,23 @@ export function pronunciationSegments(text: string): string[] {
     h: 'aitch',
   };
   const ranks = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'];
+  if (mode === 'letters') {
+    // One utterance avoids OS startup/tail silence at every file/rank boundary.
+    // A comma suggests a short pause; the selected system voice controls its duration.
+    const sentence = text
+      .replace(
+        /\b([a-h])\s*([1-8])\b/gi,
+        (_, file: string, rank: string) => `${file.toUpperCase()}, ${ranks[Number(rank) - 1]}`,
+      )
+      .trim();
+    return sentence ? [sentence] : [];
+  }
   const segments: string[] = [];
   let offset = 0,
     rest = '';
   for (const match of text.matchAll(/\b([a-h])\s*([1-8])\b/gi)) {
     segments.push(
-      `${rest}${text.slice(offset, match.index)}${files[match[1].toLowerCase()]}`.trim(),
+      `${rest}${text.slice(offset, match.index)}${mode === 'phonetic' ? files[match[1].toLowerCase()] : match[1].toUpperCase()}`.trim(),
     );
     rest = ranks[Number(match[2]) - 1];
     offset = match.index! + match[0].length;
@@ -25,10 +41,6 @@ export function pronunciationSegments(text: string): string[] {
   if (tail) segments.push(tail);
   return segments;
 }
-export function pronunciationText(text: string): string {
-  return pronunciationSegments(text).join(', ');
-}
-
 /** Simple energy-based endpointing for Whisper, with pre-roll and bounded memory. */
 export class UtteranceBuffer {
   private chunks: Float32Array[] = [];

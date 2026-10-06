@@ -109,7 +109,7 @@ test('resume and last-move commands, safe deletion, and voice settings survive r
   await expect(page.locator('.feedback')).toContainText(
     'White played pawn a 2 to a 3. Black to move.',
   );
-  await command(page, 'apex return to play');
+  await command(page, 'apex resume game');
   await command(page, 'move pawn a7 a6');
   await expect(page.locator('.count-pill')).toHaveText('2');
   await page.getByRole('button', { name: 'Repeat last move', exact: true }).click();
@@ -133,11 +133,68 @@ test('resume and last-move commands, safe deletion, and voice settings survive r
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/mobile-voice-settings.png', fullPage: true });
   await page.getByRole('checkbox', { name: /Voice debug mode/ }).uncheck();
+  await expect(page.getByLabel('Square pronunciation', { exact: true })).toHaveValue('letters');
+  await expect(page.getByLabel('Extra letter–number gap', { exact: true })).toHaveCount(0);
+  await page.getByLabel('Square pronunciation', { exact: true }).selectOption('letters-spaced');
+  await page.getByLabel('Extra letter–number gap', { exact: true }).fill('60');
+  await expect(
+    page.getByRole('button', { name: 'Test pronunciation', exact: true }),
+  ).toBeDisabled();
+  await page.getByRole('checkbox', { name: /^Spoken responses/ }).check();
+  if (await page.evaluate(() => 'speechSynthesis' in window)) {
+    await page.getByRole('button', { name: 'Test pronunciation', exact: true }).click();
+    await page.getByRole('button', { name: 'Stop test', exact: true }).click();
+  } else {
+    // The Windows WebKit test port has no speech output API; real Safari needs device testing.
+    await expect(page.getByText('This browser does not provide speech output.')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Test pronunciation', exact: true }),
+    ).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Stop test', exact: true })).toBeDisabled();
+  }
+  await page.getByRole('checkbox', { name: /^Spoken responses/ }).uncheck();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/mobile-pronunciation.png', fullPage: true });
   await expect(page.getByLabel('Minimum Vosk word confidence', { exact: true })).toBeVisible();
   await page.getByLabel('Minimum Vosk word confidence', { exact: true }).fill('0.35');
+  // Reload only once IndexedDB has committed; an immediate navigation can abort an async write.
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          new Promise((resolve, reject) => {
+            const open = indexedDB.open('apex-chess');
+            open.onerror = () => reject(open.error);
+            open.onsuccess = () => {
+              const db = open.result;
+              const get = db.transaction('preferences').objectStore('preferences').get('settings');
+              get.onsuccess = () => {
+                db.close();
+                resolve(get.result);
+              };
+              get.onerror = () => {
+                db.close();
+                reject(get.error);
+              };
+            };
+          }),
+      ),
+    )
+    .toMatchObject({
+      speechPronunciation: 'letters-spaced',
+      speechGapMs: 60,
+      voiceConfidence: 0.35,
+    });
   await page.reload();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByLabel('Local recognizer', { exact: true })).toHaveValue('vosk-open');
+  await expect(page.getByLabel('Square pronunciation', { exact: true })).toHaveValue(
+    'letters-spaced',
+  );
+  await expect(page.getByLabel('Extra letter–number gap', { exact: true })).toHaveValue('60');
+  await page.getByLabel('Square pronunciation', { exact: true }).selectOption('phonetic');
+  await page.getByLabel('Extra letter–number gap', { exact: true }).fill('160');
+  await expect(page.getByText(/previous extra gap was 160 ms/)).toBeVisible();
   await expect(page.getByRole('checkbox', { name: /Voice debug mode/ })).not.toBeChecked();
   await expect(page.getByLabel('Minimum Vosk word confidence', { exact: true })).toHaveValue(
     '0.35',

@@ -48,6 +48,22 @@ The Vosk model and default confidence have not changed in this update. The prece
 
 ## Spoken square names
 
-File letters still use phonetic spellings such as “ay” to avoid the unstressed word “a”. Output now speaks the file segment, waits 160 ms after it finishes, then speaks the rank segment. Thus `a4` is “ay … four”. Voice quality and any additional pauses depend on the installed system voice. Muting or replacing an announcement cancels its remaining segments.
+Open **Settings → Spoken pronunciation**. These controls are available with debug off, save across reloads, and affect output only. **Test pronunciation** reads the reported problem cases without changing the board. Enable Spoken responses to hear it; **Stop test** cancels the announcement.
+
+| Option                                   | Behavior                                                                                                                                                                                                                                                                |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Letters · flowing sentence** (default) | Sends one sentence such as `Black played bishop E, three to F, two.` to the system voice. Capital letters replace spellings such as `ee` and `eff`. Commas suggest a short pause without restarting synthesis after each letter. The voice controls punctuation timing. |
+| **Letters · adjustable gap**             | Uses capital letters but separates file and rank into speech chunks. The extra-gap slider adds 0–300 ms after the file chunk ends; it defaults to 40 ms.                                                                                                                |
+| **Phonetic spellings · previous method** | Retains the earlier `ay`, `bee`, `see`, `dee`, `ee`, `eff`, `jee`, `aitch` spellings and chunking. Set the extra gap to 160 ms to reproduce the old formatting and delay.                                                                                               |
+
+The extra gap is **not the total audible pause**. The system voice can add its own tail silence or startup delay, even at zero. Try the flowing sentence if segmented speech still pauses too long. Some voices interpret `ee` as two letters and `eff` as three, which may explain the reported repetitions. Capital letters avoid those multi-letter spellings, but pronunciation, especially `A`, still needs listening tests with your installed voice.
+
+**Installed English voice** lists only voices the browser reports as local. Its list updates when the browser makes voices available. An unavailable saved choice falls back to another local English voice. If none is reported, Automatic leaves the voice choice to the browser; install an English system voice for offline narration. No replacement read-aloud model is bundled. The [Web Speech API specification](https://webaudio.github.io/web-speech-api/#speechsynthesisvoice) defines this local/remote distinction and lets engines vary in their support for pronunciation markup, so this implementation uses plain text rather than relying on SSML support.
+
+Changing pronunciation settings, muting, stopping, or replacing an announcement cancels remaining chunks. Duplicate or stale end callbacks cannot queue a rank twice. Echo protection stays active across deliberate gaps. Screen text and exported PGN keep the original coordinates.
+
+## Resuming a game
+
+Say **apex resume game** to leave review at the latest position. This replaces the spoken `return to play` phrase, avoiding a required `to` in that command. `Return to play` is retained as a typed alias only. The recognizer still includes `to` for optional move connectors and promotion phrases; the successful slot assembly behavior is unchanged.
 
 Whisper is hosted entirely on the same origin: [the model publisher](https://huggingface.co/onnx-community/whisper-tiny.en) supplies the ONNX conversion, and the adapter follows [Transformers.js local-model/runtime configuration](https://huggingface.co/docs/transformers.js/en/custom_usage). Remote model loading is disabled. `scripts/whisper-checksums.json` pins the model revision and hashes; browser downloads verify every part and assembled file. Future model/runtime updates must change the cache version together with the asset URLs or explicitly invalidate the pack.

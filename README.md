@@ -28,7 +28,7 @@ Open **this directory** (`blindchess/blindchess`, containing `package.json`) as 
 2. Use the Piece / From / To selectors, or type `move pawn e2 e4` in the command bar.
 3. For voice, select **Enable microphone**, download the voice pack, then select **Enable microphone** again and allow browser access. Say **“apex move pawn e two e four”**. You can pause between required parts; an unfinished command stays visible until you complete or cancel it.
 4. The microphone keeps listening while the app is active. The microphone button pauses/resumes it. The speaker button separately mutes announcements.
-5. Games save after every move. **My games** opens them for visual or spoken review and PGN export. Resume with **Return to play** or **“apex return to play.”** The trash button deletes an individual game after confirmation, with an option to export first.
+5. Games save after every move. **My games** opens them for visual or spoken review and PGN export. Resume with **Resume game** or **“apex resume game.”** The trash button deletes an individual game after confirmation, with an option to export first.
 6. Missed an announcement? Say **“apex last move”** or select **Repeat last move**. It repeats the latest actual move in the open game, its color, and the next turn. In review it still refers to the live game and tells you that review is active.
 
 ## Comparing voice recognition
@@ -55,7 +55,7 @@ Spoken commands require the `apex` prefix by default. Typed commands accept it o
 | `apex review ten`                                  | Announce White's tenth move.                                                            |
 | `apex next`                                        | Advance one individual move (one ply).                                                  |
 | `apex next three`                                  | Advance three plies, then announce the resulting move.                                  |
-| `apex return to play`                              | Exit review and resume the latest position.                                             |
+| `apex resume game`                                 | Exit review and resume the latest position.                                             |
 | `apex last move`                                   | Repeat the open game's latest move, color, and next turn (or game result).              |
 | `apex current eval`                                | Evaluate the displayed position at maximum local engine skill.                          |
 | `apex new game self`                               | Start self play after the game ends, or from an untouched starting position.            |
@@ -67,7 +67,11 @@ All three recognizers share this assembly step. It splits coordinates such as `a
 
 Execution waits for a finalized speech segment, never a revisable draft. Include optional arguments in the same segment: bare `review`, `next`, and `new game engine` are already complete commands, and a move without a promotion suffix defaults to queen. Once complete, the normal command settings, turn checks, and chess rules apply.
 
-The **Minimum Vosk word confidence** control (50% by default) is available with debug off and applies immediately. Lower values accept more uncertain words; changing the setting clears unfinished input. Audio is processed locally. Input is suppressed during narration to avoid feedback loops. Square letters retain their phonetic spellings, with an explicit 160 ms gap before each rank: `a3` becomes “ay … three” while screen text stays unchanged.
+The **Minimum Vosk word confidence** control (50% by default) is available with debug off and applies immediately. Lower values accept more uncertain words; changing the setting clears unfinished input. Audio is processed locally. Input is suppressed during narration to avoid feedback loops.
+
+**Settings → Spoken pronunciation** offers a flowing sentence with capital file letters (default), letters with an adjustable extra gap, and the previous phonetic spelling method. Try **Test pronunciation** to compare `a2 → a4`, `bishop e3 → f2`, and `king f8 → d8` without changing a game. The two segmented modes offer an extra-gap slider from 0–300 ms; system voices may add their own pauses. Select the previous method with 160 ms to reproduce the former formatting and delay. An installed English voice picker is available; no new speech model download is required. Screen text and PGN are unaffected.
+
+The spoken resume command is now `apex resume game`; the former `return to play` phrase remains a typed alias. The word `to` remains available for optional move connectors and promotions. Command assembly, recognition models, and confidence behavior are unchanged by this rename.
 
 ## Offline use and installation
 

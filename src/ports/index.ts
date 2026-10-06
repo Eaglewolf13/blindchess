@@ -1,4 +1,4 @@
-import type { GameRecord, Settings } from '../domain/types';
+import type { GameRecord, Settings, SpeechPreferences } from '../domain/types';
 
 /** Implement these contracts for a native shell or an authenticated online backend. */
 export interface GameRepository {
@@ -23,6 +23,7 @@ export interface ChessEngine {
   dispose(): void;
 }
 export interface SpeechOutput {
+  configure(preferences: SpeechPreferences): void;
   say(text: string): void;
   setEnabled(enabled: boolean): void;
   stop(): void;

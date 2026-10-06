@@ -2633,3 +2633,8 @@ progress {
 .repeat-last {
   margin: 0 24px 16px;
 }
+.speech-test-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}

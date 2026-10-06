@@ -47,7 +47,12 @@ export type Command =
   | { type: 'returnToPlay' }
   | { type: 'lastMove' }
   | { type: 'newGame'; mode: GameMode; level: number };
-export interface Settings {
+export interface SpeechPreferences {
+  speechPronunciation: 'letters' | 'letters-spaced' | 'phonetic';
+  speechGapMs: number;
+  speechVoice: string;
+}
+export interface Settings extends SpeechPreferences {
   sound: boolean;
   requireWakeWord: boolean;
   showBoard: boolean;
@@ -63,6 +68,9 @@ export const DEFAULT_SETTINGS: Settings = {
   speechRecognizer: 'vosk',
   voiceDebug: false,
   voiceConfidence: 0.5,
+  speechPronunciation: 'letters',
+  speechGapMs: 40,
+  speechVoice: '',
   enabledCommands: {
     move: true,
     vision: true,

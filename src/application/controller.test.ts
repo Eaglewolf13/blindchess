@@ -30,7 +30,12 @@ function fixture() {
     cancel: vi.fn(),
     dispose: vi.fn(),
   };
-  const output: SpeechOutput = { say: vi.fn(), setEnabled: vi.fn(), stop: vi.fn() };
+  const output: SpeechOutput = {
+    say: vi.fn(),
+    configure: vi.fn(),
+    setEnabled: vi.fn(),
+    stop: vi.fn(),
+  };
   return {
     controller: new AppController(repository, engine, output),
     engine,
@@ -53,7 +58,7 @@ describe('application orchestration', () => {
       'Black played pawn e 7 to e 5. White to move. You are in review mode.',
     );
     expect(controller.getSnapshot().reviewPly).toBe(1);
-    await controller.executeText('apex return to play', 'voice');
+    await controller.executeText('apex resume game', 'voice');
     expect(controller.getSnapshot().reviewPly).toBeNull();
     await controller.executeText('apex move pawn a three a four', 'voice');
     expect(controller.getSnapshot().game.moves).toHaveLength(3);
@@ -122,6 +127,36 @@ describe('application orchestration', () => {
     expect(f.controller.getSnapshot().settings.speechRecognizer).toBe('vosk');
     expect(f.controller.getSnapshot().settings.enabledCommands.lastMove).toBe(true);
     expect(f.controller.getSnapshot().settings.enabledCommands.eval).toBe(false);
+    expect(f.controller.getSnapshot().settings.speechPronunciation).toBe('letters');
+    expect(f.output.configure).toHaveBeenLastCalledWith(
+      expect.objectContaining({ speechPronunciation: 'letters', speechGapMs: 40 }),
+    );
+  });
+  it('applies and saves pronunciation preferences and previews without changing the game', async () => {
+    const f = fixture();
+    f.repository.saveSettings = vi.fn();
+    await f.controller.initialize();
+    const game = f.controller.getSnapshot().game;
+    await f.controller.setSettings({
+      speechPronunciation: 'phonetic',
+      speechGapMs: 0,
+      speechVoice: 'installed',
+    });
+    expect(f.output.configure).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        speechPronunciation: 'phonetic',
+        speechGapMs: 0,
+        speechVoice: 'installed',
+      }),
+    );
+    expect(f.repository.saveSettings).toHaveBeenCalledWith(f.controller.getSnapshot().settings);
+    f.controller.previewSpeech();
+    expect(f.output.say).toHaveBeenLastCalledWith(
+      expect.stringContaining('Black played bishop e 3 to f 2.'),
+    );
+    expect(f.controller.getSnapshot().game).toEqual(game);
+    f.controller.stopSpeechPreview();
+    expect(f.output.stop).toHaveBeenCalled();
   });
   it('uses the same disabled-command policy for voice, text, and UI actions', async () => {
     const { controller } = fixture();

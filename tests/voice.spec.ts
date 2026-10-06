@@ -2,11 +2,11 @@ import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { test, expect, chromium } from '@playwright/test';
 
-for (const scenario of ['vosk', 'vosk-open', 'whisper', 'vosk-paused'])
+for (const scenario of ['vosk', 'vosk-open', 'whisper', 'vosk-paused', 'vosk-resume'])
   test(`${scenario}: offline AudioWorklet transcription and command handling`, async () => {
-    const recognizer = scenario === 'vosk-paused' ? 'vosk' : scenario;
+    const recognizer = scenario.startsWith('vosk-') && scenario !== 'vosk-open' ? 'vosk' : scenario;
     const fixture = resolve(
-      `tests/fixtures/${scenario === 'vosk-paused' ? 'paused-move' : recognizer === 'whisper' ? 'last-move' : 'move'}.wav`,
+      `tests/fixtures/${scenario === 'vosk-resume' ? 'resume-game' : scenario === 'vosk-paused' ? 'paused-move' : recognizer === 'whisper' ? 'last-move' : 'move'}.wav`,
     );
     test.setTimeout(180000);
     test.skip(!existsSync(fixture), 'Generate fixtures with scripts/generate-speech-fixture.ps1.');
@@ -50,13 +50,26 @@ for (const scenario of ['vosk', 'vosk-open', 'whisper', 'vosk-paused'])
       });
       await page.reload();
       await context.setOffline(true);
+      if (scenario === 'vosk-resume') {
+        for (const text of ['move pawn e2 e4', 'review']) {
+          await page.getByLabel('Type a command').fill(text);
+          await page.getByRole('button', { name: 'Run command', exact: true }).click();
+        }
+        await expect(page.getByRole('heading', { name: 'Walk through the game' })).toBeVisible();
+      }
       await page.getByRole('button', { name: 'Enable microphone', exact: true }).click();
       await expect(page.getByRole('button', { name: 'Pause microphone', exact: true })).toBeVisible(
         {
           timeout: 60000,
         },
       );
-      if (recognizer === 'vosk-open') {
+      if (scenario === 'vosk-resume') {
+        await expect(page.locator('.voice-log')).toContainText('Handled: returnToPlay', {
+          timeout: 30000,
+        });
+        await expect(page.getByRole('heading', { name: 'Walk through the game' })).toHaveCount(0);
+        await expect(page.locator('.count-pill')).toHaveText('1');
+      } else if (recognizer === 'vosk-open') {
         // Unrestricted English mishears this synthetic fixture as "pony to he for".
         // Verify safe rejection and visible diagnostics, not an accuracy claim.
         await expect(page.locator('.voice-log')).toContainText('apex move', { timeout: 30000 });

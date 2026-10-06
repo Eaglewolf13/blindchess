@@ -1,18 +1,30 @@
 import { describe, it, expect } from 'vitest';
-import { pronunciationText, pronunciationSegments, UtteranceBuffer } from './voice-utils';
+import { pronunciationSegments, UtteranceBuffer } from './voice-utils';
 
 describe('speech pronunciation', () => {
   it('speaks file letters and ranks without changing ordinary articles or numbers', () => {
-    expect(pronunciationText('White played bishop a3 to a 6. A game with a friend. Move 13.')).toBe(
-      'White played bishop ay, three to ay, six. A game with a friend. Move 13.',
-    );
-    expect(pronunciationText('b2 C3 d4 E5 f6 g7 H8')).toBe(
-      'bee, two see, three dee, four ee, five eff, six jee, seven aitch, eight',
-    );
+    expect(
+      pronunciationSegments('White played bishop a3 to a 6. A game with a friend. Move 13.'),
+    ).toEqual(['White played bishop A, three to A, six. A game with a friend. Move 13.']);
+    expect(pronunciationSegments('b2 C3 d4 E5 f6 g7 H8')).toEqual([
+      'B, two C, three D, four E, five F, six G, seven H, eight',
+    ]);
+    expect(pronunciationSegments('Black played bishop e 3 to f 2. King f8 to d8.')).toEqual([
+      'Black played bishop E, three to F, two. King F, eight to D, eight.',
+    ]);
   });
   it('splits precisely between file and rank for an explicit synthesis delay', () => {
-    expect(pronunciationSegments('Pawn a4.')).toEqual(['Pawn ay', 'four.']);
-    expect(pronunciationSegments('a 4 is empty.')).toEqual(['ay', 'four is empty.']);
+    expect(pronunciationSegments('Pawn a4.', 'letters-spaced')).toEqual(['Pawn A', 'four.']);
+    expect(pronunciationSegments('a 4 is empty.', 'letters-spaced')).toEqual([
+      'A',
+      'four is empty.',
+    ]);
+    expect(pronunciationSegments('Black played bishop e3 to f2.', 'phonetic')).toEqual([
+      'Black played bishop ee',
+      'three to eff',
+      'two.',
+    ]);
+    expect(pronunciationSegments('a4', 'phonetic')).toEqual(['ay', 'four']);
     expect(pronunciationSegments('White to move.')).toEqual(['White to move.']);
     expect(pronunciationSegments('')).toEqual([]);
   });

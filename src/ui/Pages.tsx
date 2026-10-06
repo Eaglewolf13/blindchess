@@ -17,6 +17,7 @@ import type { GameRecord } from '../domain/types';
 import { Modal } from './Modal';
 import { RECOGNIZERS, type RecognizerChoice } from '../adapters/offline';
 import { Trash2 } from 'lucide-react';
+import { SpeechSettings } from './SpeechSettings';
 
 export function savePgn(controller: AppController, game?: GameRecord) {
   const pgn = controller.pgn(game);
@@ -333,6 +334,7 @@ export function SettingsPage({
             {micOn ? 'Pause voice input' : 'Start voice test'}
           </button>
         </section>
+        <SpeechSettings settings={settings} controller={controller} />
         <section className="card settings-card">
           <h2>Your practice, your way</h2>
           <p className="muted">Choose what helps you concentrate.</p>
