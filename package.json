@@ -1,7 +1,7 @@
 {
   "name": "apex-blindchess",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -11,6 +11,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:webkit": "playwright test --config playwright.webkit.config.ts",
+    "test:cloud": "vitest run --config vitest.cloud.config.ts && playwright test --config playwright.cloud.config.ts",
+    "test:accounts": "node scripts/test-accounts.mjs",
     "assets": "node scripts/prepare-assets.mjs",
     "check": "tsc -b && vitest run",
     "format": "prettier --write --ignore-unknown src scripts tests docs *.ts *.json *.md"
@@ -23,6 +25,7 @@
   "dependencies": {
     "@huggingface/transformers": "3.8.1",
     "chess.js": "^1.4.0",
+    "firebase": "^12.19.0",
     "idb": "^8.0.3",
     "lucide-react": "^0.468.0",
     "react": "^19.1.1",
@@ -30,12 +33,15 @@
     "vosk-browser": "^0.0.8"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@playwright/test": "^1.56.0",
     "@types/node": "^24.0.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^5.0.4",
+    "fake-indexeddb": "^6.2.5",
     "fflate": "^0.8.2",
+    "firebase-tools": "^15.32.1",
     "prettier": "^3.6.2",
     "stockfish": "18.0.5",
     "tar-stream": "^3.1.7",

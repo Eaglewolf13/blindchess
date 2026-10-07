@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owner(uid) { return request.auth != null && request.auth.uid == uid; }
+    function validGame(d, id) {
+      return d.keys().hasAll(['id', 'ownerId', 'version', 'game'])
+        && d.keys().hasOnly(['id', 'ownerId', 'version', 'game'])
+        && d.id == id && d.ownerId is string && d.version is int && d.version > 0
+        && (d.game == null || (
+          d.game.keys().hasAll(['id', 'ownerId', 'createdAt', 'updatedAt', 'config', 'moves', 'revision', 'result', 'resultText'])
+          && d.game.keys().hasOnly(['id', 'ownerId', 'createdAt', 'updatedAt', 'config', 'moves', 'revision', 'result', 'resultText'])
+          && d.game.id == id && d.game.ownerId == d.ownerId
+          && d.game.createdAt is string && d.game.createdAt.size() <= 30
+          && d.game.updatedAt is string && d.game.updatedAt.size() <= 30
+          && d.game.config.keys().hasAll(['mode', 'level', 'playerColor'])
+          && d.game.config.keys().hasOnly(['mode', 'level', 'playerColor'])
+          && d.game.config.mode in ['self', 'engine']
+          && d.game.config.level is int && d.game.config.level >= 1 && d.game.config.level <= 8
+          && d.game.config.playerColor in ['w', 'b']
+          && d.game.moves is list && d.game.moves.size() <= 2000
+          && d.game.revision is int && d.game.revision == d.game.moves.size()
+          && (d.game.result == null || d.game.result in ['1-0', '0-1', '1/2-1/2'])
+          && (d.game.resultText == null || (d.game.resultText is string && d.game.resultText.size() <= 200))
+        ));
+    }
+    // Practice histories are public. No emails, credentials, or microphone recordings here.
+    // Friend games must use a separate server-authoritative collection in a future release.
+    match /games/{id} {
+      allow read: if true;
+      allow create: if owner(request.resource.data.ownerId) && validGame(request.resource.data, id) && request.resource.data.version == 1;
+      allow update: if owner(resource.data.ownerId)
+        && request.resource.data.ownerId == resource.data.ownerId
+        && validGame(request.resource.data, id)
+        && request.resource.data.version == resource.data.version + 1
+        && resource.data.game != null;
+      // Keep a small tombstone so an offline device cannot recreate a deleted history.
+      allow delete: if false;
+    }
+    match /profiles/{uid} {
+      allow read: if true;
+      allow create: if owner(uid)
+        && request.resource.data.keys().hasOnly(['username'])
+        && request.resource.data.username is string
+        && request.resource.data.username.matches('^[a-z0-9_]{3,24}$')
+        && getAfter(/databases/$(database)/documents/usernames/$(request.resource.data.username)).data.ownerId == uid;
+      allow update, delete: if false;
+    }
+    match /usernames/{name} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly(['ownerId'])
+        && owner(request.resource.data.ownerId) && name.matches('^[a-z0-9_]{3,24}$')
+        && getAfter(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.username == name;
+      allow update, delete: if false;
+    }
+  }
+}

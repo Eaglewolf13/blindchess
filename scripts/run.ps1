@@ -1,4 +1,4 @@
-param([ValidateSet('dev', 'preview', 'check', 'assets', 'build', 'test:e2e')][string]$Task = 'dev')
+param([ValidateSet('dev', 'preview', 'check', 'assets', 'build', 'test:e2e', 'test:accounts', 'test:webkit')][string]$Task = 'dev')
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $projectRoot

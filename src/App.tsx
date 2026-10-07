@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react';
 import {
   ArrowDownToLine,
   ArrowUpRight,
@@ -41,9 +41,15 @@ const pageNames: Record<Page, string> = {
 export default function App({
   controller,
   speech,
+  accountName,
+  onAccount,
+  syncNotice,
 }: {
   controller: AppController;
   speech: LocalSpeechInput;
+  accountName: string | null;
+  onAccount: () => void;
+  syncNotice?: ReactNode;
 }) {
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const [page, setPage] = useState<Page>('practice');
@@ -242,8 +248,8 @@ export default function App({
               <UserRound size={19} />
             </span>
             <div>
-              <strong>Local player</strong>
-              <span>Your own quiet corner.</span>
+              <strong>{accountName ?? 'Guest player'}</strong>
+              <span>{accountName ? 'Your public chess journal.' : 'Games stay in this tab.'}</span>
             </div>
             <span className="local-badge">YOU</span>
           </div>
@@ -257,6 +263,10 @@ export default function App({
             <strong>{nav.find((item) => item.id === page)?.label}</strong>
           </div>
           <div className="topbar-actions">
+            <button className="button secondary small account-button" onClick={onAccount}>
+              <UserRound size={16} />
+              {accountName ? 'Account' : 'Sign in'}
+            </button>
             {page !== 'practice' && (
               <button
                 className="icon-button"
@@ -269,7 +279,7 @@ export default function App({
             )}
             <span className="connection">
               {online ? <Wifi size={14} /> : <WifiOff size={14} />}
-              {online ? 'Local practice' : 'Offline'}
+              {online ? (accountName ? 'Online' : 'Guest play') : 'Offline'}
             </span>
             <button
               className="icon-button"
@@ -336,6 +346,7 @@ export default function App({
             </div>
           )}
           {state.settings.voiceDebug && <VoiceDiagnostics speech={speech} />}
+          {syncNotice}
           <PendingVoiceCommand speech={speech} />
           {needRefresh && (
             <div className="notice">
@@ -369,7 +380,12 @@ export default function App({
                 />
               )}
               {page === 'library' && (
-                <Library state={state} controller={controller} onOpen={() => setPage('practice')} />
+                <Library
+                  state={state}
+                  controller={controller}
+                  account={!!accountName}
+                  onOpen={() => setPage('practice')}
+                />
               )}
               {page === 'commands' && <Guide />}
               {page === 'settings' && (
@@ -413,7 +429,7 @@ export default function App({
               ) : (
                 <span>Made for a little daily practice.</span>
               )}
-              <span className="footer-version">v0.1 · OFFLINE EDITION</span>
+              <span className="footer-version">v0.2 · OFFLINE READY</span>
             </div>
           </footer>
         </main>

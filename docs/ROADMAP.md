@@ -11,13 +11,19 @@
 - Local saved games, PGN copy/download, settings, optional disabled commands, offline asset preparation.
 - A portable development setup and documentation suitable for a beginner learning the code.
 
-## Online release
+## Account release (implemented; provider deployment required)
 
-1. Choose a managed authentication service. Email is acceptable if it materially simplifies secure accounts; usernames remain the public identity. Username-only login is not a reason to invent password storage.
-2. Add profiles, friends, invitations, accept/reject, and game-color assignment through ordinary UI.
-3. Add server-authoritative, revision-checked untimed friend games with subscriptions, reconnect, and explicit disconnection state.
-4. Sync all practice/game history to accounts, preserve local offline history, and decide public/private game visibility explicitly.
-5. Add account-recovery policy appropriate to the chosen provider. No sensitive credentials in client bundles.
+- Firebase email/password authentication and password recovery, unique public usernames.
+- Public account practice histories with owner-only writes; email remains private.
+- Per-account local cache/outbox, realtime history syncing, deletion tombstones, and preserved conflicting continuations.
+- Guest history stays in the current tab and never uploads; localhost test histories are not imported.
+- Cloudflare Pages hosting with explicit offline readiness and optional persistent-storage request.
+
+## Later online play
+
+1. Add profile/history browsing, friends, invitations, accept/reject, and game-color assignment through ordinary UI.
+2. Add server-authoritative, revision-checked untimed friend games with subscriptions, reconnect, and explicit disconnection state.
+3. Consider a local whole-database backup/export and a tested restore workflow; PGN exports remain available now.
 
 ## Quality work before a broad launch
 

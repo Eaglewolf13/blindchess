@@ -2,6 +2,8 @@ import type { GameRecord, Settings, SpeechPreferences } from '../domain/types';
 
 /** Implement these contracts for a native shell or an authenticated online backend. */
 export interface GameRepository {
+  readonly ownerId?: string;
+  onGamesChanged?(listener: () => void): () => void;
   list(): Promise<GameRecord[]>;
   save(game: GameRecord): Promise<void>;
   delete(id: string): Promise<void>;

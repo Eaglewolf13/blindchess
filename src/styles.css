@@ -2638,3 +2638,55 @@ progress {
   flex-wrap: wrap;
   gap: 0.6rem;
 }
+.account-form,
+.account-form label,
+.account-links {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.account-form {
+  gap: 20px;
+}
+.account-form input {
+  padding: 12px;
+  border: 1px solid #d7d9cf;
+  border-radius: 8px;
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+.account-form small {
+  color: #686d64;
+  font-size: 12px;
+}
+.account-links {
+  align-items: flex-start;
+}
+.sync-notice {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.sync-notice p {
+  margin-bottom: 0;
+}
+.local-profile strong {
+  overflow-wrap: anywhere;
+}
+.offline-storage {
+  margin-top: 16px;
+}
+@media (max-width: 600px) {
+  .account-button {
+    padding: 8px 10px;
+  }
+  .topbar-actions {
+    gap: 8px;
+  }
+  .topbar .breadcrumb {
+    display: none;
+  }
+  .topbar {
+    justify-content: flex-end;
+  }
+}

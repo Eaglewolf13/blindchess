@@ -1,6 +1,6 @@
 # Apex · Blindfold chess
 
-An installable, offline chess practice app. Play both sides or a local Stockfish engine using English voice commands, a keyboard, or legal-move selectors. Games save automatically on your device.
+An installable, offline chess practice app. Play both sides or a local Stockfish engine using English voice commands, a keyboard, or legal-move selectors. Play as a guest or sign in with email/password to sync public game history across devices. Games save locally before uploading.
 
 ## Run it
 
@@ -119,7 +119,7 @@ docs/               Architecture, deployment, testing, and roadmap
 
 ## Current boundaries
 
-- This release is **local practice**. Accounts, public game history, friends, invitations, and online games are planned, not simulated.
+- Email/password accounts and public practice-history syncing are implemented. Public browsing, friends, invitations, and online friend games remain planned. Account services require the Firebase setup and access rules in [deployment instructions](docs/DEPLOYMENT.md). Guest games stay in this tab and are never uploaded; old localhost test games are not imported.
 - The engine is **Stockfish 18 lite, single-threaded**. Level 8 means full skill of that bundled build with an approximately 800 ms search, not the full-size desktop build or unlimited analysis. Evaluation uses approximately 1,200 ms. A watchdog stops stalled searches. Initial engine/model loading is separate from move calculation.
 - Levels 1–2 add deliberate legal mistakes to make the engine more approachable; levels are not advertised as Elo ratings.
 - Claimable threefold and fifty-move draws end practice games automatically. Full tournament draw-claim policy is not implemented.

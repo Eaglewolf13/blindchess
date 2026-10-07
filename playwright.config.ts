@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
+  testIgnore: ['**/accounts.spec.ts', '**/cloud-rules.test.ts'],
   outputDir: 'test-results/chromium',
   timeout: 90000,
   expect: { timeout: 15000 },

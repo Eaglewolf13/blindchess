@@ -62,7 +62,7 @@ There are three different stores:
 
 - A Workbox-generated service worker precaches the versioned application and local engine. Updates wait for explicit activation.
 - Cache Storage holds the complete speech archive after a verified download. The archive is downloaded in hosting-friendly parts and checked with SHA-256 before it becomes available. A service-worker route serves it to Vosk using a stable URL.
-- IndexedDB stores games/settings and Vosk's internal model data. No password or simulated account is stored.
+- IndexedDB stores account games/outboxes, device settings, and Vosk's internal model data. Firebase Auth manages persisted login credentials; application code does not store passwords. Guest history uses sessionStorage.
 
 Development middleware serves the prepared model directly. Production uses the cached model route. Offline testing must use the production preview because development asset URLs change constantly.
 
@@ -76,13 +76,23 @@ Development middleware serves the prepared model directly. Production uses the c
 
 No other command parser, help list, or speech-to-chess wiring needs to be rewritten. A future hint provider can reuse the engine port while remaining independently disableable.
 
-## Adding online games
+## Accounts and history sync
+
+`application/accounts.ts` uses Firebase Authentication for email/password login/recovery and atomically reserves a username with its public profile. Emails stay in Authentication. `main.tsx` creates a new workspace on UID changes, stops old engine/voice work, and binds its repository permanently to that identity. A late save cannot switch owners.
+
+`GuestRepository` keeps tab-scoped history, never imported on login. Device settings still use `apex-chess`; account games/outboxes use `apex-accounts-v1`, keyed by `[ownerId, id]`. `SyncedRepository` commits locally first and uploads asynchronously through the `CloudHistory` port. `FirebaseHistory` listens to a per-owner query and performs version-checked transactional writes.
+
+Cloud `version` is independent of chess revision: deletion is a versioned null-game tombstone, which rules prohibit resurrecting or physically deleting. Each pending entry has a `changeId`; an upload acknowledgment cannot clear a newer move made during upload. Compatible histories advance to newer versions; divergent branches get separate IDs. Remote deletion wins over stale offline continuation. Local merges are transactional. Firebase's own disk write cache is disabled to avoid a competing last-write-wins outbox.
+
+The controller refreshes its board/history from the local cache and invalidates engine searches for changed positions. `SyncNotice` distinguishes local saves from confirmed uploads. Pending changes survive logout and upload on that account's next login. Offline play needs cached assets and a previously signed-in identity, not a new offline login. Public browsing/profile screens are intentionally deferred; current rules already separate ownership from visibility.
+
+## Adding friend games
 
 Online is a planned second implementation, not a second game UI. `OnlineGameTransport` already describes revision-checked move submission and subscriptions. A real backend must authenticate players, authorize access, verify the side to move and legal move, then append the move atomically. Never trust a browser-submitted FEN or result.
 
-The local game repository can be wrapped with a sync repository/outbox. Local self/engine games remain playable offline. Friend games must clearly pause when disconnected; do not let both devices invent an offline continuation and overwrite each other later. Local unsynced practice records can upload with stable IDs, ownership, and revision checks after login.
+The practice-history outbox is now implemented. Friend games must use a separate server-authoritative collection/API and pause when disconnected. Public practice-history writes are not a multiplayer security boundary. Do not allow both players to invent offline continuations and overwrite each other later.
 
-The current `ownerId: null` means device-local practice. Assigning an account owner requires an explicit import/sync step. Public game visibility is separate from who may edit the game. Passwords still need a mature authentication system and proper hashing even if the game data is public.
+`ownerId: null` means guest practice. Signed-in games receive their owner at creation; existing guest games never acquire an owner. Future friends/profiles can use the existing immutable `profiles/{uid}` and `usernames/{name}` records.
 
 ## Native packaging later
 

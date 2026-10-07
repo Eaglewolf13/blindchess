@@ -18,6 +18,7 @@ import { Modal } from './Modal';
 import { RECOGNIZERS, type RecognizerChoice } from '../adapters/offline';
 import { Trash2 } from 'lucide-react';
 import { SpeechSettings } from './SpeechSettings';
+import { OfflineStorage } from './OfflineStorage';
 
 export function savePgn(controller: AppController, game?: GameRecord) {
   const pgn = controller.pgn(game);
@@ -32,10 +33,12 @@ export function Library({
   state,
   controller,
   onOpen,
+  account,
 }: {
   state: AppState;
   controller: AppController;
   onOpen: () => void;
+  account: boolean;
 }) {
   const games = state.games.filter((game) => game.moves.length);
   const [copied, setCopied] = useState<string | null>(null);
@@ -57,7 +60,7 @@ export function Library({
         <p>Every move is part of the practice.</p>
         <span className="tag">
           <HardDrive size={14} />
-          Saved on this device
+          {account ? 'Public account history' : 'Guest history · this tab only'}
         </span>
       </div>
       {games.length === 0 ? (
@@ -140,7 +143,10 @@ export function Library({
       )}
       <p className="page-footnote">
         PGN is the standard chess game format. Import it into Lichess, Chess.com, or another
-        analysis app. Accounts and shared games are planned for the online release.
+        analysis app.{' '}
+        {account
+          ? 'Your account history is public; only you can edit it.'
+          : 'Guest games are not uploaded and may disappear when this tab is closed.'}
       </p>
       {deleting && (
         <Modal
@@ -157,8 +163,10 @@ export function Library({
             moves.
           </p>
           <p>
-            This removes the game from this device permanently. Download its PGN first if you want
-            to keep a copy.
+            {account
+              ? 'This removes the game from your account when synced. Other devices will update when connected.'
+              : 'This removes the game from this tab permanently.'}{' '}
+            Download its PGN first if you want to keep a copy.
           </p>
           <div className="delete-actions">
             <button
@@ -428,14 +436,16 @@ export function SettingsPage({
             Browser storage can be cleared or evicted. Check these indicators before a trip. Spoken
             responses also need an installed English system voice.
           </p>
+          <OfflineStorage />
         </section>
         <section className="privacy-note">
           <ShieldCheck size={20} />
           <div>
             <strong>Just you and the position.</strong>
             <p>
-              Speech is processed on your device. Games are stored in this browser. No account or
-              audio upload is needed.
+              Speech is processed on your device. Guest games stay in this tab. Signed-in games are
+              saved locally and synced to your public account history when connected. Audio is never
+              uploaded.
             </p>
           </div>
         </section>

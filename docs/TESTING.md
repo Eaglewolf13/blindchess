@@ -1,8 +1,9 @@
 # Testing
 
-## Verified in this workspace · 6 October 2026
+## Verified in this workspace · 7 October 2026
 
-- TypeScript check and all **86 unit/application tests passed**, including a fast-engine regression that updates the board before narration finishes while keeping “Move made” ahead of the engine announcement. Queue cancellation, duplicate callbacks, synthesis failures, gap timers, zero-gap speech coalescing, voice fallback, and saved-settings migration are also covered.
+- TypeScript check and all **95 unit/application tests passed**, including account isolation, durable offline writes, sync conflicts, deletion races, and the existing speech/engine regressions.
+- All **3 Firestore rules tests** and the **two-browser account integration test** passed against the local Auth/Firestore emulators. Account signup, guest separation, shared history, offline reload/moves, reconnection, deletion, and logout were exercised without using the production database.
 - Production build passed, including a generated service worker with app, speech runtime, and Stockfish assets.
 - All **11 Chrome integration tests passed**, covering offline play, both voice packs, resume/last-move commands, deletion, pronunciation/diagnostic settings, and three microphone modes. Restricted Vosk executes a continuous move, a move split by a 4.5-second pause with preceding background words, and the new `apex resume game` command; general Vosk leaves its mistranscription unfinished without executing; Whisper executes a separate synthetic last-move command. These test integration, not human accuracy.
 - All **6 WebKit integration tests passed** using the stopped-origin method explained below. These cover the new UI, deletion, and cached voice resources. With the generated WAV present, the Whisper pack test also runs actual WASM transcription in an offline Worker in both Chrome and WebKit.
@@ -59,3 +60,9 @@ Use the production preview locally or a deployed HTTPS site. Plain HTTP over a L
 ## Accuracy measurements
 
 Before changing confidence thresholds or selecting a different model, collect a small consented command/noise fixture set. Track exact command accuracy (including both squares), accidental commands per hour, median/95th-percentile latency, and device/browser. Synthetic speech can verify the pipeline but cannot substitute for a user's accent, room noise, or microphone.
+
+## Accounts and access rules
+
+Run `npm run test:accounts` (Java 21+ and Node 24). It builds an emulator-only bundle, starts local Firebase Auth/Firestore for **demo-apex**, tests the real Firestore rules, and exercises signup, guest separation, two browser sessions, offline account reload/moves, reconnection, deletion, and logout. The script restores a normal production bundle afterward even if a test fails. It never writes to the live Firebase project. Do not publish an emulator build.
+
+`npm run check` also tests transactional local storage, account isolation, pending writes across restarts, edits/deletes arriving during upload, conflict preservation, and stale-device deletion protection. Public reads and owner-only writes are tested separately against the emulator rules.

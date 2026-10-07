@@ -36,6 +36,9 @@ export class AppController {
   private session = new GameSession(newRecord({ mode: 'self', level: 3, playerColor: 'w' }));
   private listeners = new Set<() => void>();
   private epoch = 0;
+  private disposed = false;
+  private historyRequest = 0;
+  private unsubscribeHistory?: () => void;
   private state: AppState = {
     ready: false,
     game: structuredClone(this.session.record),
@@ -54,7 +57,62 @@ export class AppController {
     private repository: GameRepository,
     private engine: ChessEngine,
     private output: SpeechOutput,
-  ) {}
+  ) {
+    this.session.record.ownerId = repository.ownerId ?? null;
+    this.unsubscribeHistory = repository.onGamesChanged?.(() => {
+      void this.refreshHistory();
+    });
+  }
+  dispose() {
+    this.disposed = true;
+    ++this.epoch;
+    this.unsubscribeHistory?.();
+    this.listeners.clear();
+    this.engine.cancel();
+    this.output.stop();
+  }
+  /** Pull cache changes into the live board, cancelling any engine search for an older position. */
+  async refreshHistory() {
+    if (!this.state.ready || this.disposed) return;
+    const request = ++this.historyRequest;
+    const revision = this.session.record.revision;
+    const id = this.session.record.id;
+    try {
+      const games = await this.repository.list();
+      if (
+        this.disposed ||
+        request !== this.historyRequest ||
+        this.session.record.id !== id ||
+        this.session.record.revision !== revision
+      )
+        return;
+      const current = games.find((game) => game.id === id);
+      const previouslySaved = this.state.games.some((game) => game.id === id);
+      if (
+        (current && JSON.stringify(current) !== JSON.stringify(this.session.record)) ||
+        (!current && previouslySaved && !this.state.deletingGameId)
+      ) {
+        ++this.epoch;
+        this.engine.cancel();
+        this.session = new GameSession(
+          current ?? newRecord({ mode: 'self', level: 3, playerColor: 'w' }),
+        );
+        this.session.record.ownerId = this.repository.ownerId ?? null;
+        this.update({
+          busy: null,
+          evaluation: null,
+          reviewPly:
+            this.state.reviewPly === null
+              ? null
+              : Math.min(this.state.reviewPly, this.session.record.moves.length),
+        });
+      }
+      this.update({ games });
+      void this.maybeEngineMove();
+    } catch {
+      /* The save path reports local storage failures; network errors have their own indicator. */
+    }
+  }
   getSnapshot = () => this.state;
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -63,6 +121,7 @@ export class AppController {
     };
   };
   private update(patch: Partial<AppState> = {}) {
+    if (this.disposed) return;
     this.state = { ...this.state, ...patch, game: structuredClone(this.session.record) };
     const position = this.position();
     this.state.fen = position.fen();
@@ -75,6 +134,7 @@ export class AppController {
       : this.session.positionAt(this.state.reviewPly);
   }
   private message(text: string, kind: AppState['feedback']['kind'] = 'info', speak = true) {
+    if (this.disposed) return;
     this.update({ feedback: { text, kind, id: this.state.feedback.id + 1 } });
     if (speak) this.output.say(kind === 'error' ? `Error: ${text}` : text);
   }
@@ -92,6 +152,7 @@ export class AppController {
         this.repository.list(),
         this.repository.loadSettings(),
       ]);
+      if (this.disposed) return;
       if (games[0] && !games[0].result) this.session = new GameSession(games[0]);
       const restored = {
         ...DEFAULT_SETTINGS,
@@ -102,6 +163,7 @@ export class AppController {
       this.output.setEnabled(restored.sound);
       this.output.configure(restored);
       this.update({ ready: true, games, settings: restored });
+      await this.refreshHistory();
       void this.maybeEngineMove();
     } catch {
       this.update({
@@ -156,6 +218,7 @@ export class AppController {
     this.engine.cancel();
     this.output.stop();
     this.session = new GameSession(newRecord(config));
+    this.session.record.ownerId = this.repository.ownerId ?? null;
     this.update({ reviewPly: null, busy: null, evaluation: null });
     this.message(
       config.mode === 'self'
@@ -166,6 +229,10 @@ export class AppController {
     void this.maybeEngineMove();
   }
   openGame(record: GameRecord) {
+    if (record.ownerId !== (this.repository.ownerId ?? null)) {
+      this.message('This game belongs to a different account.', 'error');
+      return;
+    }
     if (!this.state.settings.enabledCommands.review) {
       this.message('Review is disabled in practice settings.', 'error');
       return;
@@ -209,10 +276,15 @@ export class AppController {
       await this.repository.delete(id);
       if (this.session.record.id === id) {
         this.session = new GameSession(newRecord({ mode: 'self', level: 3, playerColor: 'w' }));
+        this.session.record.ownerId = this.repository.ownerId ?? null;
         this.update({ reviewPly: null, evaluation: null });
       }
       this.update({ games: this.state.games.filter((game) => game.id !== id) });
-      this.message('Game deleted from this device.');
+      this.message(
+        this.repository.ownerId
+          ? 'Game deleted. Other devices will update when connected.'
+          : 'Game deleted from this device.',
+      );
       return true;
     } catch {
       this.message('This game could not be deleted. Please try again.', 'error');
@@ -366,6 +438,7 @@ export class AppController {
   async maybeEngineMove() {
     const { config } = this.session.record;
     if (
+      this.disposed ||
       config.mode !== 'engine' ||
       this.session.record.result ||
       this.session.chess.turn() === config.playerColor ||

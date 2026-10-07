@@ -12,3 +12,9 @@ public/asset-manifest.json
 *.tsbuildinfo
 tests/fixtures/*.wav
 .DS_Store
+*-debug.log
+.firebase/
+.env
+.env.*
+.account-test.log
+backups/
